@@ -11,7 +11,7 @@ import Control.Monad.State.Lazy hiding (state)
 import Data.Data
 
 import Language.Fortran.Analysis
-import Language.Fortran.Analysis.Types
+import Language.Fortran.Analysis.Types.Traverse
 import Language.Fortran.Analysis.Renaming
 import Language.Fortran.AST (ProgramFile)
 

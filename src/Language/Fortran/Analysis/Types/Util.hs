@@ -1,0 +1,148 @@
+{-# LANGUAGE FlexibleContexts #-}
+
+module Language.Fortran.Analysis.Types.Util where
+
+import           Language.Fortran.AST
+import           Language.Fortran.Util.Position
+import           Language.Fortran.Version
+import           Language.Fortran.Intrinsics
+import           Language.Fortran.Analysis
+import           Language.Fortran.Analysis.Types.Internal
+import           Language.Fortran.Repr.Type
+
+import           Data.Data
+import           Data.Generics.Biplate
+import           Control.Monad.State.Strict
+import           Control.Monad.Reader
+import qualified Data.Map               as Map
+
+inferState0 :: FortranVersion -> InferState
+inferState0 v = InferState
+  { environ     = Map.empty
+  , structs     = Map.empty
+  , entryPoints = Map.empty
+  , langVersion = v
+  , intrinsics  = getVersionIntrinsics v
+  , typeErrors  = []
+  , constMap    = Map.empty
+  }
+
+inferConfig0 :: InferConfig
+inferConfig0 = InferConfig
+  { inferConfigAcceptNonCharLengthAsKind = True
+  }
+
+runInfer :: FortranVersion -> TypeEnv -> Infer a -> (a, InferState)
+runInfer v env f = flip runReader inferConfig0 $ flip runStateT ((inferState0 v) { environ = env }) f
+
+typeError :: MonadState InferState m => String -> SrcSpan -> m ()
+typeError msg ss = modify $ \ s -> s { typeErrors = (msg, ss):typeErrors s }
+
+emptyType :: IDType
+emptyType = IDType Nothing Nothing
+
+-- Record the type of the given name.
+recordType :: FTypeScalar -> ConstructType -> Name -> Infer ()
+recordType st ct n = modify $ \ s -> s { environ = Map.insert n (IDType (Just st) (Just ct)) (environ s) }
+
+recordStruct :: StructMemberTypeEnv -> Name -> Infer ()
+recordStruct mt n = modify $ \s -> s { structs = Map.insert n mt (structs s) }
+
+-- Record the type (maybe) of the given name.
+recordMType :: Maybe FTypeScalar -> Maybe ConstructType -> Name -> Infer ()
+recordMType st ct n = modify $ \ s -> s { environ = Map.insert n (IDType st ct) (environ s) }
+
+-- Record the CType of the given name.
+recordCType :: MonadState InferState m => ConstructType -> Name -> m ()
+recordCType ct n = modify $ \ s -> s { environ = Map.alter changeFunc n (environ s) }
+  where changeFunc mIDType = Just (IDType (mIDType >>= idVType) (Just ct))
+
+-- Record the SemType of the given name.
+recordSemType :: FTypeScalar -> Name -> Infer ()
+recordSemType st n = modify $ \ s -> s { environ = Map.alter changeFunc n (environ s) }
+  where changeFunc mIDType = Just (IDType (Just st) (mIDType >>= idCType))
+
+recordEntryPoint :: Name -> Name -> Maybe Name -> Infer ()
+recordEntryPoint fn en mRetName = modify $ \ s -> s { entryPoints = Map.insert en (fn, mRetName) (entryPoints s) }
+
+getRecordedType :: Name -> Infer (Maybe IDType)
+getRecordedType n = gets (Map.lookup n . environ)
+
+getExprRecordedType :: Data a => Expression (Analysis a) -> Infer (Maybe IDType)
+getExprRecordedType e@(ExpValue _ _ (ValVariable _)) = getRecordedType $ varName e
+getExprRecordedType (ExpSubscript _ _ base _) = do
+  mTy <- getExprRecordedType base
+  case mTy of
+    Just (IDType semTy (Just CTArray{})) -> pure . Just $ IDType semTy (Just CTVariable)
+    _ -> pure Nothing
+getExprRecordedType (ExpDataRef _ _ base ref) = do
+  mTy <- getExprRecordedType base
+  case mTy of
+    Just (IDType (Just (FTypeScalarCustom n)) _) -> do
+      mStructEnv <- gets (Map.lookup n . structs)
+      case mStructEnv of
+        Nothing -> pure Nothing
+        Just env -> pure $ Map.lookup (varName ref) env
+    x -> pure x
+getExprRecordedType _ = pure Nothing
+
+-- Set the idType annotation
+setIDType :: Annotated f => IDType -> f (Analysis a) -> f (Analysis a)
+setIDType ty x =
+    let a = getAnnotation x
+     in setAnnotation (a { idType = Just ty }) x
+
+-- Get the idType annotation
+getIDType :: (Annotated f, Data a) => f (Analysis a) -> Maybe IDType
+getIDType x = idType (getAnnotation x)
+
+-- | For all types holding an 'IDType' (in an 'Analysis'), set the 'SemType'
+--   field of the 'IDType'.
+setSemType :: (Annotated f, Data a) => FTypeScalar -> f (Analysis a) -> f (Analysis a)
+setSemType st x =
+    let anno  = getAnnotation x
+        idt   = idType anno
+        anno' = anno { idType = Just (setIDTypeSemType idt) }
+     in setAnnotation anno' x
+  where
+    setIDTypeSemType :: Maybe IDType -> IDType
+    setIDTypeSemType (Just (IDType _ mCt)) = IDType (Just st) mCt
+    setIDTypeSemType Nothing               = IDType (Just st) Nothing
+
+-- Set the CType part of idType annotation
+--setCType :: (Annotated f, Data a) => ConstructType -> f (Analysis a) -> f (Analysis a)
+--setCType ct x
+--  | a@(Analysis { idType = Nothing }) <- getAnnotation x = setAnnotation (a { idType = Just (IDType Nothing (Just ct)) }) x
+--  | a@(Analysis { idType = Just it }) <- getAnnotation x = setAnnotation (a { idType = Just (it { idCType = Just ct }) }) x
+
+type UniFunc f g a = f (Analysis a) -> [g (Analysis a)]
+
+{-
+allProgramUnits :: Data a => UniFunc ProgramFile ProgramUnit a
+allProgramUnits = universeBi
+
+allDeclarators :: Data a => UniFunc ProgramFile Declarator a
+allDeclarators = universeBi
+
+allStatements :: (Data a, Data (f (Analysis a))) => UniFunc f Statement a
+allStatements = universeBi
+
+allExpressions :: (Data a, Data (f (Analysis a))) => UniFunc f Expression a
+allExpressions = universeBi
+-}
+
+isAttrDimension :: Attribute a -> Bool
+isAttrDimension AttrDimension {} = True
+isAttrDimension _                = False
+
+isAttrParameter :: Attribute a -> Bool
+isAttrParameter AttrParameter {} = True
+isAttrParameter _                = False
+
+isAttrExternal :: Attribute a -> Bool
+isAttrExternal AttrExternal {} = True
+isAttrExternal _               = False
+
+isIxSingle :: Index a -> Bool
+isIxSingle IxSingle {} = True
+isIxSingle _           = False

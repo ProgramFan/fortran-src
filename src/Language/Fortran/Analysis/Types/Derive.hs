@@ -12,10 +12,9 @@ import           Language.Fortran.Util.Position
 import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
---import           Language.Fortran.Analysis.Parameters
-import qualified Language.Fortran.Analysis.Parameters       as Eval
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Value
+import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
 
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader

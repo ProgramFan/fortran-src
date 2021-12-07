@@ -2,7 +2,11 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE FlexibleContexts    #-}
 
-module Language.Fortran.Analysis.Types.Traverse where
+module Language.Fortran.Analysis.Types
+  ( module Language.Fortran.Analysis.Types
+  , TypeEnv
+  , TypeError
+  ) where
 
 import Prelude hiding ( EQ, LT, GT )
 
@@ -11,7 +15,7 @@ import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
 import qualified Language.Fortran.Analysis.Types.Derive     as Derive
-import           Language.Fortran.Analysis.Parameters
+import           Language.Fortran.Analysis.Constants
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Value
 import           Language.Fortran.Intrinsics
@@ -55,14 +59,13 @@ analyseAndCheckTypesWithEnv env pf = (pf', tenv, terrs)
 
 analyseTypesWithEnv' :: Data a => TypeEnv -> ProgramFile (Analysis a) -> (ProgramFile (Analysis a), InferState)
 analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ do
-  -- Do const work
-  modify $ \s -> s { constMap = gatherConsts pf }
-
-  -- Gather information.
-  mapM_ intrinsicsExp (allExpressions pf)
-  mapM_ programUnit (allProgramUnits pf)
-  --mapM_ recordArrayDeclarator (allDeclarators pf)
-  mapM_ statement (allStatements pf)
+  mcm <- lift $ withReaderT inferConfigConstantIntrinsics $ gatherConsts pf
+  cm <- case mcm of
+          Right cm -> return cm
+          Left err -> do
+            typeError ("bad constants: " <> show err) (getSpan pf)
+            return Map.empty
+  modify $ \s -> s { constMap = cm }
 
   -- Gather types for known entry points.
   eps <- gets (Map.toList . entryPoints)
@@ -77,6 +80,11 @@ analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ d
 
   annotateTypes pf              -- Annotate AST nodes with their types.
 
+type TransType f g a = (f (Analysis a) -> Infer (f (Analysis a))) -> g (Analysis a) -> Infer (g (Analysis a))
+annotateTypes :: Data a => ProgramFile (Analysis a) -> Infer (ProgramFile (Analysis a))
+annotateTypes pf = (transformBiM :: Data a => TransType Expression ProgramFile a) annotateExpression pf >>=
+                   (transformBiM :: Data a => TransType ProgramUnit ProgramFile a) annotateProgramUnit
+
 -- TODO here, we should parse values into a Repr.Value type, allowing us to
 -- check for initial safety. we can't put them into the parameter map, but we
 -- should be able to store their validated/strong repr value in the annotation!
@@ -86,3 +94,23 @@ annotateExpression = undefined
 annotateProgramUnit :: Data a => ProgramUnit (Analysis a) -> Infer (ProgramUnit (Analysis a))
 annotateProgramUnit pu | Named n <- puName pu = maybe pu (`setIDType` pu) `fmap` getRecordedType n
 annotateProgramUnit pu                        = return pu
+
+-- | Regenerate the 'TypeEnv' for the given type-annotated 'ProgramFile'.
+--
+-- The type analysis builds a 'TypeEnv' as it traverses the program. When
+-- complete, the program is re-traversed to annotate AST nodes with their type
+-- where relevant.
+--
+-- The 'TypeEnv' is returned along with the annotated program, so you should use
+-- that where possible. In cases where you don't have the 'TypeEnv', but you do
+-- have the type-annotated AST, you can use this function to regenerate the
+-- 'TypeEnv' faster than rebuilding it via re-traversal.
+regenerateTypeEnv :: forall a. Data a => ProgramFile (Analysis a) -> TypeEnv
+regenerateTypeEnv pf = Map.union puEnv expEnv
+  where
+    puEnv  = Map.fromList [ (n, ty) | pu <- universeBi pf :: [ProgramUnit (Analysis a)]
+                                    , Named n <- [puName pu]
+                                    , ty <- maybeToList (idType (getAnnotation pu)) ]
+    expEnv = Map.fromList [ (n, ty) | e@(ExpValue _ _ ValVariable{}) <- universeBi pf :: [Expression (Analysis a)]
+                                    , let n = varName e
+                                    , ty <- maybeToList (idType (getAnnotation e)) ]

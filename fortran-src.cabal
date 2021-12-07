@@ -64,14 +64,15 @@ library
   exposed-modules:
       Language.Fortran.Analysis
       Language.Fortran.Analysis.BBlocks
+      Language.Fortran.Analysis.Constants
       Language.Fortran.Analysis.DataFlow
       Language.Fortran.Analysis.ModGraph
-      Language.Fortran.Analysis.Parameters
       Language.Fortran.Analysis.Renaming
+      Language.Fortran.Analysis.Types
       Language.Fortran.Analysis.Types.Derive
       Language.Fortran.Analysis.Types.Internal
-      Language.Fortran.Analysis.Types.Traverse
       Language.Fortran.Analysis.Types.Util
+      Language.Fortran.Analysis.Util
       Language.Fortran.AST
       Language.Fortran.AST.AList
       Language.Fortran.AST.Annotated
@@ -96,6 +97,7 @@ library
       Language.Fortran.Parser.Monad
       Language.Fortran.Parser.ParserUtils
       Language.Fortran.PrettyPrint
+      Language.Fortran.Repr.Eval.Scalar
       Language.Fortran.Repr.Type
       Language.Fortran.Repr.Value
       Language.Fortran.Rewriter

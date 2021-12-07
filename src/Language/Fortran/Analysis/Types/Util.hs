@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Language.Fortran.Analysis.Types.Util where
 
@@ -16,24 +17,25 @@ import           Control.Monad.State.Strict
 import           Control.Monad.Reader
 import qualified Data.Map               as Map
 
-inferState0 :: FortranVersion -> InferState
-inferState0 v = InferState
+inferState0 :: InferState
+inferState0 = InferState
   { environ     = Map.empty
   , structs     = Map.empty
   , entryPoints = Map.empty
-  , langVersion = v
-  , intrinsics  = getVersionIntrinsics v
   , typeErrors  = []
   , constMap    = Map.empty
   }
 
-inferConfig0 :: InferConfig
-inferConfig0 = InferConfig
+inferConfig0 :: FortranVersion -> InferConfig
+inferConfig0 v = InferConfig
   { inferConfigAcceptNonCharLengthAsKind = True
+  , inferConfigConstantIntrinsics        = Map.empty
+  , inferConfigLangVersion               = v
+  , inferConfigIntrinsics                = getVersionIntrinsics v
   }
 
 runInfer :: FortranVersion -> TypeEnv -> Infer a -> (a, InferState)
-runInfer v env f = flip runReader inferConfig0 $ flip runStateT ((inferState0 v) { environ = env }) f
+runInfer v env f = flip runReader (inferConfig0 v) $ flip runStateT (inferState0 { environ = env }) f
 
 typeError :: MonadState InferState m => String -> SrcSpan -> m ()
 typeError msg ss = modify $ \ s -> s { typeErrors = (msg, ss):typeErrors s }
@@ -114,35 +116,3 @@ setSemType st x =
 --setCType ct x
 --  | a@(Analysis { idType = Nothing }) <- getAnnotation x = setAnnotation (a { idType = Just (IDType Nothing (Just ct)) }) x
 --  | a@(Analysis { idType = Just it }) <- getAnnotation x = setAnnotation (a { idType = Just (it { idCType = Just ct }) }) x
-
-type UniFunc f g a = f (Analysis a) -> [g (Analysis a)]
-
-{-
-allProgramUnits :: Data a => UniFunc ProgramFile ProgramUnit a
-allProgramUnits = universeBi
-
-allDeclarators :: Data a => UniFunc ProgramFile Declarator a
-allDeclarators = universeBi
-
-allStatements :: (Data a, Data (f (Analysis a))) => UniFunc f Statement a
-allStatements = universeBi
-
-allExpressions :: (Data a, Data (f (Analysis a))) => UniFunc f Expression a
-allExpressions = universeBi
--}
-
-isAttrDimension :: Attribute a -> Bool
-isAttrDimension AttrDimension {} = True
-isAttrDimension _                = False
-
-isAttrParameter :: Attribute a -> Bool
-isAttrParameter AttrParameter {} = True
-isAttrParameter _                = False
-
-isAttrExternal :: Attribute a -> Bool
-isAttrExternal AttrExternal {} = True
-isAttrExternal _               = False
-
-isIxSingle :: Index a -> Bool
-isIxSingle IxSingle {} = True
-isIxSingle _           = False

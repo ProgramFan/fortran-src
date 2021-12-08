@@ -12,7 +12,6 @@ import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Repr.Type
 
 import           Data.Data
-import           Data.Generics.Biplate
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader
 import qualified Data.Map               as Map
@@ -64,7 +63,7 @@ recordSemType :: FTypeScalar -> Name -> Infer ()
 recordSemType st n = modify $ \ s -> s { environ = Map.alter changeFunc n (environ s) }
   where changeFunc mIDType = Just (IDType (Just st) (mIDType >>= idCType))
 
-recordEntryPoint :: Name -> Name -> Maybe Name -> Infer ()
+recordEntryPoint :: MonadState InferState m => Name -> Name -> Maybe Name -> m ()
 recordEntryPoint fn en mRetName = modify $ \ s -> s { entryPoints = Map.insert en (fn, mRetName) (entryPoints s) }
 
 getRecordedType :: Name -> Infer (Maybe IDType)

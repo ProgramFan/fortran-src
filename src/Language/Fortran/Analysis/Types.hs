@@ -12,25 +12,19 @@ import Prelude hiding ( EQ, LT, GT )
 
 import           Language.Fortran.AST
 import           Language.Fortran.Analysis
+import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
-import qualified Language.Fortran.Analysis.Types.Derive     as Derive
+import qualified Language.Fortran.Analysis.Types.Traverse   as Traverse
 import           Language.Fortran.Analysis.Constants
-import           Language.Fortran.Repr.Type
-import           Language.Fortran.Repr.Value
-import           Language.Fortran.Intrinsics
 import           Language.Fortran.Util.Position
-import           Language.Fortran.Version
-import           Language.Fortran.Parser.Utils
 
 import           Data.Data
 import           Data.Generics.Uniplate.Data
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader
 import qualified Data.Map as Map
-import           Data.Map ( Map )
 import           Data.Maybe (maybeToList)
-import           Data.List (find, foldl')
 
 -- | Annotate AST nodes with type information and also return a type
 -- environment mapping names to type information.
@@ -66,6 +60,9 @@ analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ d
             typeError ("bad constants: " <> show err) (getSpan pf)
             return Map.empty
   modify $ \s -> s { constMap = cm }
+
+  mapM_ Traverse.programUnit $ allProgramUnits pf
+  mapM_ Traverse.declarator  $ allDeclarators  pf
 
   -- Gather types for known entry points.
   eps <- gets (Map.toList . entryPoints)

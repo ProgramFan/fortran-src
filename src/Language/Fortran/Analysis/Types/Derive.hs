@@ -9,11 +9,9 @@ module Language.Fortran.Analysis.Types.Derive where
 
 import           Language.Fortran.AST
 import           Language.Fortran.Util.Position
-import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Repr.Type
-import           Language.Fortran.Repr.Value
 import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
 
 import           Control.Monad.State.Strict
@@ -23,6 +21,8 @@ data Error
   = ErrorInvalidSyntax String
   | ErrorEval Eval.Error
   | ErrorTypeKindNotSupported String Integer -- TODO ?
+  | ErrorUnimplemented String
+    deriving (Eq, Show)
 
 -- | Attempt to derive a variable's 'ScalarTy' from the relevant parts of its
 --   surrounding 'StDeclaration'.
@@ -49,25 +49,25 @@ data Error
 -- The same syntax is parsed regardless of type, and an RHS length can be used
 -- as a kind (and override any LHS kind) if configured. This matches gfortran's
 -- behaviour.
---
--- The internal functions this uses aren't user-facing. Some are non-total, and
--- will runtime error on unexpected parameters (which in normal operation are
--- handled before their call).
---
--- Note that the user must not use the 'Selector''s annotation or 'SrcSpan'
--- further. Changing this would require a bunch of awkward glue types and code.
 fromDeclaration
     :: forall a m
     . (MonadState InferState m, MonadReader InferConfig m)
-    => SrcSpan -> SrcSpan -> TypeSpec a -> Maybe (Expression a) -> m (Either Error FTypeScalar)
-fromDeclaration stmtSs declSs ts@(TypeSpec tsA tsSS bt mSel) mLenExpr =
+    => TypeSpec a -> Maybe (Expression a) -> m (Either Error FTypeScalar)
+fromDeclaration (TypeSpec _ _ bt mSel) mLenExpr =
     case bt of
       TypeCharacter -> go chooseLenExpr
-      TypeCustom s  -> go chooseKindParamExpr
+      _             -> go chooseKindParamExpr
   where
     go f = do
         expr <- f mSel mLenExpr
         fromBaseTypeMaybeKindParam bt expr
+
+-- | Named 'fromDeclaration' shortcut.
+fromTypeSpec
+    :: forall a m
+    . (MonadState InferState m, MonadReader InferConfig m)
+    => TypeSpec a -> m (Either Error FTypeScalar)
+fromTypeSpec x = fromDeclaration x Nothing
 
 fromBaseTypeMaybeKindParam
     :: Monad m
@@ -77,7 +77,13 @@ fromBaseTypeMaybeKindParam bt mkp =
       TypeCustom s ->
         case mkp of
           Nothing -> return $ Right $ FTypeScalarCustom s
-          Just kp -> return $ Left $ ErrorInvalidSyntax "TypeCustom had a kind parameter"
+          Just _  -> return $ Left $ ErrorInvalidSyntax "TypeCustom had a kind parameter"
+      TypeInteger ->
+        case mkp of
+          Nothing -> return $ Right $ FTypeScalarInt FTypeInt4 -- TODO default kind selection
+          Just _  -> return $ Left $ ErrorUnimplemented "int with kind param"
+      -- etc...
+      _ -> return $ Left $ ErrorUnimplemented $ "unhandled basetype: " <> show bt
 
 -- CHARACTER-specific (checks length field). Needs state for 'typeError'.
 chooseLenExpr
@@ -89,7 +95,7 @@ chooseLenExpr mSel mLenExpr =
       Just lenExpr ->
         case mSelLenExpr of
           Nothing -> return $ Just lenExpr
-          Just selLenExpr -> do
+          Just _ -> do
             flip typeError (getSpan lenExpr) $
                 "note: CHARACTER variable given both LHS length and RHS length"
              <> ": specific RHS declarator overrides"
@@ -107,7 +113,7 @@ chooseKindParamExpr mSel mRHSkp =
       Just rhsKp ->
         case mSelKp of
           Nothing -> return $ Just rhsKp
-          Just selKp -> do
+          Just _ -> do
             flip typeError (getSpan rhsKp) $
                 "note: non-CHARACTER variable given both"
              <> " LHS kind param and RHS nonstandard kind param"

@@ -6,6 +6,7 @@ import           Language.Fortran.AST
 import           Language.Fortran.Analysis
 import           Data.Generics.Uniplate.Operations
 
+-- TODO fix the warning (this is bad somehow)
 type UniFunc f g a =    Biplate (f (Analysis a)) (g (Analysis a))
                      => f (Analysis a)
                      -> [g (Analysis a)]

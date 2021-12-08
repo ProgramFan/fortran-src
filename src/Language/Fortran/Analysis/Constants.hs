@@ -26,12 +26,10 @@ module Language.Fortran.Analysis.Constants where
 import           Language.Fortran.AST
 import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Util
-import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Value
 import qualified Language.Fortran.Repr.Eval.Scalar  as Eval
 
 import           Data.Data
-import           Data.Generics.Uniplate.Operations
 import qualified Data.Map                   as Map
 import           Data.Map                   ( Map )
 import           Control.Monad.Reader

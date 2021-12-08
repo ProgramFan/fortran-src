@@ -8,10 +8,6 @@ module Language.Fortran.Repr.Value where
 
 import           Language.Fortran.Repr.Type
 
-import           Language.Fortran.AST
-import           Language.Fortran.Util.Position
-import           Language.Fortran.Version
-
 import           Data.Data                      ( Data, Typeable )
 import           GHC.Generics                   ( Generic )
 import           Data.Binary                    ( Binary )

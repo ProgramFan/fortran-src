@@ -60,7 +60,7 @@ st1 mc v idt =
           Just sv ->
               let fvv = scalarValueToFortranVarsValue sv
                in SParameter fvt fvv
-      _ -> SVariable fvt undefined
+      _ -> SVariable fvt (v, 0) -- TODO loc???
   where
     fvt =
         case idVType idt of

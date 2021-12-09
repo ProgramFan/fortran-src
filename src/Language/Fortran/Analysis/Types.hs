@@ -63,7 +63,7 @@ analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ d
   mapM_ Traverse.intrinsicsExp $ allExpressions  pf
   mapM_ Traverse.programUnit   $ allProgramUnits pf
   mapM_ Traverse.declarator    $ allDeclarators  pf
-  --mapM_ Traverse.statement     $ allStatements   pf -- TODO
+  mapM_ Traverse.statement     $ allStatements   pf
 
   -- Gather types for known entry points.
   eps <- gets (Map.toList . entryPoints)
@@ -86,8 +86,11 @@ annotateTypes pf = (transformBiM :: Data a => TransType Expression ProgramFile a
 -- TODO here, we should parse values into a Repr.Value type, allowing us to
 -- check for initial safety. we can't put them into the parameter map, but we
 -- should be able to store their validated/strong repr value in the annotation!
-annotateExpression :: Data a => Expression (Analysis a) -> Infer (Expression (Analysis a))
-annotateExpression = undefined
+-- TODO shouldn't be a state monad.
+annotateExpression
+    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
+    => Expression (Analysis a) -> m (Expression (Analysis a))
+annotateExpression = return
 
 annotateProgramUnit :: Data a => ProgramUnit (Analysis a) -> Infer (ProgramUnit (Analysis a))
 annotateProgramUnit pu | Named n <- puName pu = maybe pu (`setIDType` pu) `fmap` getRecordedType n

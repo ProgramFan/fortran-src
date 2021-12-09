@@ -125,7 +125,7 @@ handleDeclaration
     -> [Attribute (Analysis a)]
     -> [Declarator (Analysis a)]
     -> m [(Name, IDType)]
-handleDeclaration = undefined
+handleDeclaration _ _ _ = return []
 --handleDeclaration ts attrs decls = tryDeriveInitialCType >>= _
 {-
       Just ct ->

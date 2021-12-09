@@ -43,10 +43,15 @@ emptyType :: IDType
 emptyType = IDType Nothing Nothing
 
 -- Record the type of the given name.
-recordType :: FTypeScalar -> ConstructType -> Name -> Infer ()
+recordType
+    :: MonadState InferState m => FTypeScalar -> ConstructType -> Name -> m ()
 recordType st ct n = modify $ \ s -> s { environ = Map.insert n (IDType (Just st) (Just ct)) (environ s) }
 
-recordStruct :: StructMemberTypeEnv -> Name -> Infer ()
+recordType'
+    :: MonadState InferState m => Name -> IDType -> m ()
+recordType' n idt = modify $ \ s -> s { environ = Map.insert n idt (environ s) }
+
+recordStruct :: MonadState InferState m => StructMemberTypeEnv -> Name -> m ()
 recordStruct mt n = modify $ \s -> s { structs = Map.insert n mt (structs s) }
 
 -- Record the type (maybe) of the given name.
@@ -66,10 +71,12 @@ recordSemType st n = modify $ \ s -> s { environ = Map.alter changeFunc n (envir
 recordEntryPoint :: MonadState InferState m => Name -> Name -> Maybe Name -> m ()
 recordEntryPoint fn en mRetName = modify $ \ s -> s { entryPoints = Map.insert en (fn, mRetName) (entryPoints s) }
 
-getRecordedType :: Name -> Infer (Maybe IDType)
+getRecordedType :: MonadState InferState m => Name -> m (Maybe IDType)
 getRecordedType n = gets (Map.lookup n . environ)
 
-getExprRecordedType :: Data a => Expression (Analysis a) -> Infer (Maybe IDType)
+getExprRecordedType
+    :: (MonadState InferState m, Data a)
+    => Expression (Analysis a) -> m (Maybe IDType)
 getExprRecordedType e@(ExpValue _ _ (ValVariable _)) = getRecordedType $ varName e
 getExprRecordedType (ExpSubscript _ _ base _) = do
   mTy <- getExprRecordedType base

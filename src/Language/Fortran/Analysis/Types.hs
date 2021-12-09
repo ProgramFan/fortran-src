@@ -53,16 +53,17 @@ analyseAndCheckTypesWithEnv env pf = (pf', tenv, terrs)
 
 analyseTypesWithEnv' :: Data a => TypeEnv -> ProgramFile (Analysis a) -> (ProgramFile (Analysis a), InferState)
 analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ do
-  mcm <- lift $ withReaderT inferConfigConstantIntrinsics $ gatherConsts pf
-  cm <- case mcm of
+  cm <- lift (withReaderT inferConfigConstantIntrinsics $ gatherConsts pf) >>= \case
           Right cm -> return cm
           Left err -> do
             typeError ("bad constants: " <> show err) (getSpan pf)
             return Map.empty
   modify $ \s -> s { constMap = cm }
 
-  mapM_ Traverse.programUnit $ allProgramUnits pf
-  mapM_ Traverse.declarator  $ allDeclarators  pf
+  mapM_ Traverse.intrinsicsExp $ allExpressions  pf
+  mapM_ Traverse.programUnit   $ allProgramUnits pf
+  mapM_ Traverse.declarator    $ allDeclarators  pf
+  --mapM_ Traverse.statement     $ allStatements   pf -- TODO
 
   -- Gather types for known entry points.
   eps <- gets (Map.toList . entryPoints)

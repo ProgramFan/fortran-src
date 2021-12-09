@@ -75,6 +75,12 @@ parseKindInt = \case
   8 -> Just FTypeInt8
   _ -> Nothing
 
+prettyKindInt :: Integral a => FTypeInt -> a
+prettyKindInt = \case FTypeInt1 -> 1
+                      FTypeInt2 -> 2
+                      FTypeInt4 -> 4
+                      FTypeInt8 -> 8
+
 fTypeIntMax :: FTypeInt -> Integer
 fTypeIntMax = \case FTypeInt1 -> toInteger (maxBound @Int8)
                     FTypeInt2 -> toInteger (maxBound @Int16)

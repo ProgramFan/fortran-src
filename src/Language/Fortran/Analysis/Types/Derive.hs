@@ -52,8 +52,8 @@ data Error
 fromDeclaration
     :: forall a m
     . (MonadState InferState m, MonadReader InferConfig m)
-    => TypeSpec a -> Maybe (Expression a) -> m (Either Error FTypeScalar)
-fromDeclaration (TypeSpec _ _ bt mSel) mLenExpr =
+    => Maybe (Expression a) -> TypeSpec a -> m (Either Error FTypeScalar)
+fromDeclaration mLenExpr (TypeSpec _ _ bt mSel) =
     case bt of
       TypeCharacter -> go chooseLenExpr
       _             -> go chooseKindParamExpr
@@ -67,7 +67,7 @@ fromTypeSpec
     :: forall a m
     . (MonadState InferState m, MonadReader InferConfig m)
     => TypeSpec a -> m (Either Error FTypeScalar)
-fromTypeSpec x = fromDeclaration x Nothing
+fromTypeSpec = fromDeclaration Nothing
 
 fromBaseTypeMaybeKindParam
     :: Monad m

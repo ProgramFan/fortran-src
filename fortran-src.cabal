@@ -70,6 +70,7 @@ library
       Language.Fortran.Analysis.Renaming
       Language.Fortran.Analysis.Types
       Language.Fortran.Analysis.Types.Derive
+      Language.Fortran.Analysis.Types.FortranVars
       Language.Fortran.Analysis.Types.Internal
       Language.Fortran.Analysis.Types.Traverse
       Language.Fortran.Analysis.Types.Util

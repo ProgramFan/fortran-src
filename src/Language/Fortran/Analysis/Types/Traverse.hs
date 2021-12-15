@@ -48,9 +48,10 @@ programUnit pu@(PUSubroutine _ _ _ _ _ blocks _) | Named n <- puName pu = do
 programUnit _                                           = return ()
 
 declarator :: (MonadState InferState m, Data a) => Declarator (Analysis a) -> m ()
-declarator (Declarator _ _ v (Just ddAList) _ _) =
-    recordCType (CTArray $ dimDeclarator ddAList) (varName v)
-declarator _ = return ()
+declarator (Declarator _ _ v declType _ _) =
+    case declType of
+      ScalarDecl -> return ()
+      ArrayDecl dims -> recordCType (CTArray $ dimDeclarator dims) (varName v)
 
 -- TODO const eval them, don't limit to ints!!
 dimDeclarator :: AList DimensionDeclarator a -> [(Maybe Int, Maybe Int)]

@@ -27,6 +27,9 @@ data FValInt = FValInt FTypeInt Integer
 -- | A bounds-checked operation on 'ty'. True is valid, False is invalid.
 type CheckedOp ty = ty -> ty -> (ty, Bool)
 
+fValIntIsWellBounded :: FValInt -> Bool
+fValIntIsWellBounded (FValInt t v) = not $ v > fTypeIntMax t || v < fTypeIntMin t
+
 -- | Apply a binary operator to two 'FValInt's and check that no bounds issues may
 --   have been present.
 --
@@ -37,7 +40,7 @@ fValIntSafeBinOp op (FValInt t1 v1) (FValInt t2 v2) = (FValInt t v, isInBound)
   where
     v = v1 `op` v2
     t = max t1 t2
-    isInBound = if v > fTypeIntMax t || v < fTypeIntMin t then False else True
+    isInBound = fValIntIsWellBounded $ FValInt t v
 
 fValIntSafeAdd :: CheckedOp FValInt
 fValIntSafeAdd = fValIntSafeBinOp (+)

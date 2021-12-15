@@ -44,7 +44,8 @@ emptyType = IDType Nothing Nothing
 
 -- Record the type of the given name.
 recordType
-    :: MonadState InferState m => FTypeScalar -> ConstructType -> Name -> m ()
+    :: MonadState InferState m
+    => FTypeScalar -> ConstructType -> Name -> m ()
 recordType st ct n = modify $ \ s -> s { environ = Map.insert n (IDType (Just st) (Just ct)) (environ s) }
 
 recordType'
@@ -55,7 +56,9 @@ recordStruct :: MonadState InferState m => StructMemberTypeEnv -> Name -> m ()
 recordStruct mt n = modify $ \s -> s { structs = Map.insert n mt (structs s) }
 
 -- Record the type (maybe) of the given name.
-recordMType :: Maybe FTypeScalar -> Maybe ConstructType -> Name -> Infer ()
+recordMType
+    :: MonadState InferState m
+    => Maybe FTypeScalar -> Maybe ConstructType -> Name -> m ()
 recordMType st ct n = modify $ \ s -> s { environ = Map.insert n (IDType st ct) (environ s) }
 
 -- Record the CType of the given name.
@@ -63,10 +66,10 @@ recordCType :: MonadState InferState m => ConstructType -> Name -> m ()
 recordCType ct n = modify $ \ s -> s { environ = Map.alter changeFunc n (environ s) }
   where changeFunc mIDType = Just (IDType (mIDType >>= idVType) (Just ct))
 
--- Record the SemType of the given name.
-recordSemType :: FTypeScalar -> Name -> Infer ()
-recordSemType st n = modify $ \ s -> s { environ = Map.alter changeFunc n (environ s) }
-  where changeFunc mIDType = Just (IDType (Just st) (mIDType >>= idCType))
+recordScalarType :: MonadState InferState m => Name -> FTypeScalar -> m ()
+recordScalarType n ft =
+    modify $ \s -> s { environ = Map.alter changeFunc n (environ s) }
+  where changeFunc mIDType = Just (IDType (Just ft) (mIDType >>= idCType))
 
 recordEntryPoint :: MonadState InferState m => Name -> Name -> Maybe Name -> m ()
 recordEntryPoint fn en mRetName = modify $ \ s -> s { entryPoints = Map.insert en (fn, mRetName) (entryPoints s) }

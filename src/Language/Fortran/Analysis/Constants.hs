@@ -87,11 +87,11 @@ sameConstructor = (==) `on` toConstr
 
 handleParamDecl
     :: (MonadState ConstMap m, MonadReader IntrinsicsEvalMap m, Data a)
-    => Declarator (Analysis a) -> m (Either Error ())
-handleParamDecl (Declarator _ _ varExpr mDims _ mInitExpr) =
-    case mDims of
-      Just{}  -> error "impossible parse: array declarator in parameter declarator list"
-      Nothing ->
+    => Declarator (Analysis a) -> m (Either Error FValScalar)
+handleParamDecl (Declarator _ _ varExpr declType _ mInitExpr) =
+    case declType of
+      ArrayDecl{} -> error "impossible parse: array declarator in parameter declarator list"
+      ScalarDecl ->
         case mInitExpr of
           Nothing -> error "impossible parse: no init expr in parameter declarator"
           Just initExpr -> go initExpr
@@ -99,8 +99,8 @@ handleParamDecl (Declarator _ _ varExpr mDims _ mInitExpr) =
     go initExpr = do
         evalEnv <- makeEvalEnv
         case Eval.eval evalEnv initExpr of
-          Left err -> return $ Left $ ErrorEval err
-          Right val -> assignConst (varName varExpr) val
+          Left  err -> return $ Left $ ErrorEval err
+          Right val -> assignConst (varName varExpr) val >> return (Right val)
     makeEvalEnv = do
         cm <- get
         im <- ask

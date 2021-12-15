@@ -54,13 +54,10 @@ fromDeclaration
     . (MonadState InferState m, MonadReader InferConfig m)
     => Maybe (Expression a) -> TypeSpec a -> m (Either Error FTypeScalar)
 fromDeclaration mLenExpr (TypeSpec _ _ bt mSel) =
-    case bt of
-      TypeCharacter -> go chooseLenExpr
-      _             -> go chooseKindParamExpr
-  where
-    go f = do
-        expr <- f mSel mLenExpr
-        fromBaseTypeMaybeKindParam bt expr
+    case bt of TypeCharacter -> go chooseLenExpr
+               _             -> go chooseKindParamExpr
+  where go f = do expr <- f mSel mLenExpr
+                  fromBaseTypeMaybeKindParam bt expr
 
 -- | Named 'fromDeclaration' shortcut.
 fromTypeSpec

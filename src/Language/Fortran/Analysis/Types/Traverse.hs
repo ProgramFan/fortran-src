@@ -11,6 +11,9 @@ import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Analysis.Types.Internal
 import qualified Language.Fortran.Analysis.Types.Derive     as Derive
 import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Value
+import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
+import qualified Language.Fortran.Repr.Coerce               as Coerce
 import           Language.Fortran.Intrinsics
 
 import           Data.Data
@@ -29,11 +32,11 @@ programUnit pu@(PUFunction _ _ mRetType _ _ _ mRetVar blocks _)
     recordCType CTFunction n
     case (mRetType, mRetVar) of
       (Just ts@(TypeSpec _ _ _ _), Just v) -> do
-        tryDerive Derive.fromTypeSpec ts $ \ft -> do
+        tryDeriveTypeVia Derive.fromTypeSpec ts $ \ft -> do
           recordScalarType n           ft
           recordScalarType (varName v) ft
       (Just ts@(TypeSpec _ _ _ _), _)      -> do
-        tryDerive Derive.fromTypeSpec ts $ \ft -> do
+        tryDeriveTypeVia Derive.fromTypeSpec ts $ \ft -> do
           recordScalarType n ft
       _                                        -> return ()
     -- record entry points for later annotation
@@ -79,10 +82,11 @@ intrinsicsExp = \case
         _             -> return ()
     go _ = return ()
 
-statement :: (MonadState InferState m, MonadReader InferConfig m, Data a) => Statement (Analysis a) -> m ()
+statement
+    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
+    => Statement (Analysis a) -> m ()
 statement (StDeclaration _ _ ts mAttrAList declAList) = do
-  decls <- handleDeclaration ts (aStrip' mAttrAList) (aStrip declAList)
-  forM_ decls $ uncurry recordType'
+  mapM_ (handleDeclarator ts (aStrip' mAttrAList)) (aStrip declAList)
 statement (StExternal _ _ varAList) = do
   let vars = aStrip varAList
   mapM_ (recordCType CTExternal . varName) vars
@@ -101,64 +105,43 @@ statement (StFunction _ _ v _ _) = recordCType CTFunction (varName v)
 -- (part of answer to above is) nullary function statement: foo() = ...
 statement (StExpressionAssign _ _ (ExpFunctionCall _ _ v Nothing) _) = recordCType CTFunction (varName v)
 
-statement (StDimension _ _ declAList) = do
-  let decls = aStrip declAList
-  forM_ decls $ \ decl -> case decl of
-    Declarator _ _ v (Just ddAList) _ _ ->
-      recordCType (CTArray $ dimDeclarator ddAList) (varName v)
-    _                           -> return ()
+statement (StDimension _ _ declAList) =
+  forM_ (aStrip declAList) $ \(Declarator _ _ v declType _ _) ->
+      case declType of
+        ScalarDecl     -> return ()
+        ArrayDecl dims -> recordCType (CTArray $ dimDeclarator dims) (varName v)
 
-statement (StStructure _ _ mName itemAList) = handleStructure mName itemAList
+-- TODO
+--statement (StStructure _ _ mName itemAList) = handleStructure mName itemAList
 
 statement _ = return ()
 
--- | Auxiliary function for getting semantic and construct type of a
---   declaration. Used in standard declarations and structures.
---
--- Returns a list of names to their derived 'IDType'. Variables that errored
--- during scalar type derivation have the relevant 'IDType' field left blank.
---
 -- TODO report if given dimension info on LHS and RHS
 -- TODO handle params... agh...
-handleDeclaration
-    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
+handleDeclarator
+    :: forall m a. (MonadState InferState m, MonadReader InferConfig m, Data a)
     => TypeSpec (Analysis a)
     -> [Attribute (Analysis a)]
-    -> [Declarator (Analysis a)]
-    -> m [(Name, IDType)]
-handleDeclaration _ _ _ = return []
---handleDeclaration ts attrs decls = tryDeriveInitialCType >>= _
-{-
-      Just ct ->
-      Nothing ->
-    let mct | any isAttrExternal attrs = return $ Just CTExternal
-            | Just (AttrDimension _ _ ddAlist) <- List.find isAttrDimension attrs
-    cType <-
-        then return CTExternal
-        else case List.find isAttrDimension attrs of
-               Just (AttrDimension _ _ ddAList) ->
-                 return $ CTArray $ dimDeclarator ddAList
-               _ ->
-                 if   any isAttrParameter attrs
-                 then return CTParameter
-                 else Nothing getRecordedType n >>= \case 
-                | Just (IDType _ (Just ct)) <- Map.lookup n env
-                , ct /= CTIntrinsic                           = ct
-    let cType n | isExtrn                                     = CTExternal
-                | Just (AttrDimension _ _ ddAList) <- attrDim = CTArray (dimDeclarator ddAList)
-                | isParam                                     = CTParameter
-                | Just (IDType _ (Just ct)) <- Map.lookup n env
-                , ct /= CTIntrinsic                           = ct
-                | otherwise                                   = CTVariable
-        handler rs = \case
-          Declarator _ declSs v (Just ddAList) mLenExpr _ -> do
-            tryDerive (Derive.fromDeclaration mLenExpr) ts $ \ft -> do
-              pure $ (varName v, st, CTArray  $ dimDeclarator ddAList) : rs
-          Declarator _ declSs v Nothing mLenExpr _ -> do
-            tryDerive (Derive.fromDeclaration mLenExpr) ts $ \ft -> do
-              pure $ (varName v, st, cType (varName v)) : rs
-    in foldM handler [] decls
--}
+    -> Declarator (Analysis a)
+    -> m ()
+handleDeclarator _ _ (Declarator _ _ _ ArrayDecl{} _ _) =
+    error "handle array declarator unimplemented"
+handleDeclarator ts attrs decl@(Declarator _ _ v ScalarDecl _ _) =
+    handleCType >>= \case
+      Just CTParameter -> handleScalarConstDecl ts decl
+      _ -> return ()
+  where
+    wrapCType cty = recordCType cty (varName v) >> return (Just cty)
+    handleCType
+      | any isAttrExternal attrs = wrapCType CTExternal
+      | Just (AttrDimension _ _ _dims) <- List.find isAttrDimension attrs =
+          error "handle dims in declarator"
+      | any isAttrParameter attrs = wrapCType CTParameter
+      | otherwise = do
+          getRecordedType (varName v) >>= \case
+            Just (IDType _ (Just cty)) ->
+              if cty /= CTIntrinsic then wrapCType cty else wrapCType CTVariable
+            _ -> wrapCType CTVariable
 
 -- | Try to derive the scalar type information for a variable and record if
 --   successful.
@@ -167,8 +150,38 @@ tryRecordScalarType
     => Name -> Maybe (Expression (Analysis a)) -> TypeSpec (Analysis a)
     -> m ()
 tryRecordScalarType v mDeclExpr ts = do
-    tryDerive (Derive.fromDeclaration mDeclExpr) ts $ recordScalarType v
+    tryDeriveTypeVia (Derive.fromDeclaration mDeclExpr) ts $ recordScalarType v
 
+-- | Try to record the type and initial value of a scalar constant (PARAMETER)
+--   declaration.
+--
+-- TODO use len if character
+handleScalarConstDecl
+    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
+    => TypeSpec (Analysis a)
+    -> Declarator (Analysis a)
+    -> m ()
+handleScalarConstDecl _ (Declarator _ _ _ _ _ Nothing) =
+    -- Should be an impossible parse, so the function has been used incorrectly.
+    error "PARAMETER declarator missing initialization expression"
+handleScalarConstDecl _ (Declarator _ _ _ ArrayDecl{}  _ _) =
+    error "scalar const handler received array const"
+handleScalarConstDecl ts (Declarator _ ss v ScalarDecl mLenExpr (Just initExpr)) = do
+    Derive.fromDeclaration mLenExpr ts >>= \case
+      Left  err -> do
+        typeError ("error while deriving a type: " <> show err) ss
+      Right fty -> do
+        recordScalarType (varName v) fty
+        evalExpr initExpr >>= \case
+          Left  err  ->
+            typeError ("failed to evaluate initialization expression: " <> show err) (getSpan initExpr)
+          Right fval -> do
+            case Coerce.coerceScalar fval fty of
+              Left  err   -> do
+                typeError ("error while coercing PARAMETER initial value to its type: " <> show err) (getSpan initExpr)
+              Right fval' -> assignConst (varName v) fval' ss
+
+{-
 -- | Create a structure env from the list of fields and add it to the InferState
 handleStructure
     :: (MonadState InferState m, MonadReader InferConfig m, Data a)
@@ -189,21 +202,43 @@ handleStructureItem mt (StructFields _ _ ts mAttrAList declAList) = do
 -- TODO: These should eventually be implemented
 handleStructureItem mt StructUnion{} = pure mt
 handleStructureItem mt StructStructure{} = pure mt
+-}
 
 --------------------------------------------------------------------------------
 
-recordScalarType :: MonadState InferState m => Name -> FTypeScalar -> m ()
-recordScalarType n ft =
-    modify $ \s -> s { environ = Map.alter changeFunc n (environ s) }
-  where changeFunc mIDType = Just (IDType (Just ft) (mIDType >>= idCType))
-
-tryDerive
+-- Wrapper around Derive functions to use the 'Spanned' instance from the
+-- 'TypeSpec' you pass. (Generalized to all 'Spanned' because why not.)
+tryDeriveTypeVia
     :: (MonadState InferState m, Spanned a)
     => (a -> m (Either Derive.Error FTypeScalar))
     -> a
     -> (FTypeScalar -> m ())
     -> m ()
-tryDerive fDerive a useType =
+tryDeriveTypeVia fDerive a useType =
     fDerive a >>= \case
       Left err -> typeError ("error while deriving a type: " <> show err) (getSpan a)
       Right ft -> useType ft
+
+data Error = ErrorEval Eval.Error deriving (Eq, Show)
+
+-- Doesn't touch state.
+evalExpr
+    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
+    => Expression a -> m (Either Error FValScalar)
+evalExpr e = do
+    evalEnv <- makeEvalEnv
+    case Eval.eval evalEnv e of
+      Left  err -> return $ Left $ ErrorEval err
+      Right val -> return $ Right val
+  where makeEvalEnv = do cm <- gets constMap
+                         im <- asks inferConfigConstantIntrinsics
+                         return $ Eval.Env cm im
+
+assignConst :: MonadState InferState m => Name -> FValScalar -> SrcSpan -> m ()
+assignConst var val ss = do
+    cm <- gets constMap
+    case Map.member var cm of
+      True  -> typeError ("PARAMETER redefined (using new value)") ss
+      False -> return ()
+    let cm' = Map.insert var val cm
+    modify $ \s -> s { constMap = cm' }

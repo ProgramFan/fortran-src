@@ -119,7 +119,7 @@ statement _ = return ()
 -- TODO report if given dimension info on LHS and RHS
 -- TODO handle params... agh...
 handleDeclarator
-    :: forall m a. (MonadState InferState m, MonadReader InferConfig m, Data a)
+    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
     => TypeSpec (Analysis a)
     -> [Attribute (Analysis a)]
     -> Declarator (Analysis a)

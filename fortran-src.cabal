@@ -99,6 +99,7 @@ library
       Language.Fortran.Parser.Monad
       Language.Fortran.Parser.ParserUtils
       Language.Fortran.PrettyPrint
+      Language.Fortran.Repr.Coerce
       Language.Fortran.Repr.Eval.Scalar
       Language.Fortran.Repr.Type
       Language.Fortran.Repr.Value

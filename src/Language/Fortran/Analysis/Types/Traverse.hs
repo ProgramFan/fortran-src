@@ -116,8 +116,6 @@ statement (StDimension _ _ declAList) =
 
 statement _ = return ()
 
--- TODO report if given dimension info on LHS and RHS
--- TODO handle params... agh...
 handleDeclarator
     :: (MonadState InferState m, MonadReader InferConfig m, Data a)
     => TypeSpec (Analysis a)

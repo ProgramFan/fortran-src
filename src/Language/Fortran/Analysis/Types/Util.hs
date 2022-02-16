@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Language.Fortran.Analysis.Types.Util where
@@ -9,7 +8,7 @@ import           Language.Fortran.Version
 import           Language.Fortran.Intrinsics
 import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Types.Internal
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
 
 import           Data.Data
 import           Control.Monad.State.Strict

@@ -102,6 +102,8 @@ library
       Language.Fortran.Repr.Coerce
       Language.Fortran.Repr.Eval.Scalar
       Language.Fortran.Repr.Type
+      Language.Fortran.Repr.Type.Array
+      Language.Fortran.Repr.Type.Scalar
       Language.Fortran.Repr.Value
       Language.Fortran.Rewriter
       Language.Fortran.Rewriter.Internal
@@ -214,7 +216,6 @@ test-suite spec
       Language.Fortran.Analysis.BBlocksSpec
       Language.Fortran.Analysis.DataFlowSpec
       Language.Fortran.Analysis.RenamingSpec
-      Language.Fortran.Analysis.TypesSpec
       Language.Fortran.AnalysisSpec
       Language.Fortran.AST.Literal.BozSpec
       Language.Fortran.AST.Literal.RealSpec
@@ -230,7 +231,7 @@ test-suite spec
       Language.Fortran.Parser.Free.LexerSpec
       Language.Fortran.Parser.MonadSpec
       Language.Fortran.PrettyPrintSpec
-      Language.Fortran.ReprSpec
+      Language.Fortran.Repr.TypeSpec
       Language.Fortran.Rewriter.InternalSpec
       Language.Fortran.RewriterSpec
       Language.Fortran.Transformation.Disambiguation.FunctionSpec

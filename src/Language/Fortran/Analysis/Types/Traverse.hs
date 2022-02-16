@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Language.Fortran.Analysis.Types.Traverse where
 
 import           Language.Fortran.AST
@@ -10,7 +7,7 @@ import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Analysis.Types.Internal
 import qualified Language.Fortran.Analysis.Types.Derive     as Derive
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
 import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
 import qualified Language.Fortran.Repr.Coerce               as Coerce

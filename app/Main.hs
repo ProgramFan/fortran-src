@@ -112,16 +112,16 @@ main = do
           tenv      = combinedTypeEnv mods
           pvm       = combinedParamVarMap mods
 
-      let runTypes = analyseAndCheckTypesWithEnv tenv . analyseRenamesWithModuleMap mmap . initAnalysis
+      --let runTypes = analyseAndCheckTypesWithEnv tenv . analyseRenamesWithModuleMap mmap . initAnalysis
       let runRenamer = stripAnalysis . rename . analyseRenamesWithModuleMap mmap . initAnalysis
-      let runBBlocks pf = showBBlocks pf' ++ "\n\n" ++ showDataFlow pf'
+          runBBlocks pf = showBBlocks pf' ++ "\n\n" ++ showDataFlow pf'
             where pf' = analyseParameterVars pvm . analyseBBlocks . analyseRenamesWithModuleMap mmap . initAnalysis $ pf
-      let runSuperGraph pf | outfmt == DOT = superBBGrToDOT sgr
+          runSuperGraph pf | outfmt == DOT = superBBGrToDOT sgr
                            | otherwise     = superGraphDataFlow pf' sgr
             where pf' = analyseParameterVars pvm . analyseBBlocks . analyseRenamesWithModuleMap mmap . initAnalysis $ pf
                   bbm = genBBlockMap pf'
                   sgr = genSuperBBGr bbm
-      let findBlockPU pf astBlockId = listToMaybe
+          findBlockPU pf astBlockId = listToMaybe
             [ pu | pu <- universeBi pf :: [ProgramUnit (Analysis A0)]
                  , bbgr <- maybeToList (bBlocks (getAnnotation pu))
                  , b <- concatMap snd $ labNodes (bbgrGr bbgr)

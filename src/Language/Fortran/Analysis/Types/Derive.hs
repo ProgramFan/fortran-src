@@ -2,8 +2,6 @@
 -- these functions are in the 'Infer' monad.
 
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE FlexibleContexts    #-}
 
 module Language.Fortran.Analysis.Types.Derive where
 
@@ -11,7 +9,7 @@ import           Language.Fortran.AST
 import           Language.Fortran.Util.Position
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
 import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
 
 import           Control.Monad.State.Strict

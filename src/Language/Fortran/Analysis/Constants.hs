@@ -15,11 +15,7 @@
 -- F90 ISO spec is great for this. See pg.38.
 
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts    #-}
 
 module Language.Fortran.Analysis.Constants where
 

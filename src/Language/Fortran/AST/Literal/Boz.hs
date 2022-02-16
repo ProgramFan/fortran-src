@@ -27,6 +27,7 @@ import           GHC.Generics
 import           Data.Data
 import           Control.DeepSeq                ( NFData )
 import           Text.PrettyPrint.GenericPretty ( Out )
+import           Data.Binary                    ( Binary )
 
 import qualified Data.List as List
 import qualified Data.Char as Char
@@ -47,7 +48,7 @@ data Boz = Boz
   -- ^ Was the prefix actually postfix i.e. @'123'z@? This is non-standard
   --   syntax, disabled by default in gfortran. Syntactic info.
   } deriving stock    (Eq, Show, Generic, Data, Typeable, Ord)
-    deriving anyclass (NFData, Out)
+    deriving anyclass (NFData, Out, Binary)
 
 data BozPrefix
   = BozPrefixB              -- ^ binary (bitstring)
@@ -58,7 +59,7 @@ data BozPrefix
 
 data Conforming = Conforming | Nonconforming
     deriving stock    (Eq, Show, Generic, Data, Typeable, Ord)
-    deriving anyclass (NFData, Out)
+    deriving anyclass (NFData, Out, Binary)
 
 -- | UNSAFE. Parses a BOZ literal constant string.
 --

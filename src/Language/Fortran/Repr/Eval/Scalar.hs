@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+-- | Fortran expression evaluation.
 
 module Language.Fortran.Repr.Eval.Scalar where
 
@@ -11,37 +11,46 @@ import           Data.Data ( Data )
 import qualified Data.Map  as Map
 import           Data.Map  ( Map )
 
+-- | Immutable expression evaluation environment.
 data Env = Env
   { envVars       :: Map Name FValScalar
   , envIntrinsics :: Map Name ()
+  -- ^ Named intrinsics and their implementations.
   }
 
 data Error
   = ErrorVarUndefined Name
+  | ErrorNoSuchIntrinsic String
   | ErrorUnsupportedExpression String
-  | ErrorUnsupportedValue String
+
+  | ErrorUnsupportedValue String -- ^ yet-unsupported 'Value' constructor
   | ErrorUnsupportedCommonType String String
+  | ErrorUnsupportedBinOp String
+  -- ^ No intrinsic with the given name in the intrinsic map. May indicate you
+  --   used a non-compile time intrinsic.
     deriving (Eq, Show)
 
 eval :: Data a => Env -> Expression a -> Either Error FValScalar
-eval env v = case v of
-  ExpValue _ _ valExpr -> case valExpr of
-    ValVariable v -> do
-      case Map.lookup v (envVars env) of
-        Nothing  -> Left $ ErrorVarUndefined v
-        Just val -> return val
-    _ -> evalValue valExpr
+eval env = \case
+  ExpValue _ _ ve ->
+    case ve of
+      ValVariable v ->
+        case Map.lookup v (envVars env) of
+          Nothing  -> Left $ ErrorVarUndefined v
+          Just val -> return val
+      _ -> evalValue ve
 
-  ExpBinary a s op valExpr1 valExpr2 -> do
+  ExpBinary _a _s op valExpr1 valExpr2 -> do
     res1 <- eval env valExpr1
     res2 <- eval env valExpr2
     case evalBinaryOp op res1 res2 of
-      Left  _   -> Left $ ErrorUnsupportedExpression $ show $ Data.toConstr v
+      Left  _   -> Left $ ErrorUnsupportedBinOp $ show op
       Right res -> Right res
 
   e -> Left $ ErrorUnsupportedExpression $ show $ Data.toConstr e
 
--- | Must not be a 'ValVariable'.
+-- | Helper for evaluating non-variable 'Value's, which don't need the
+--   evaluation environment.
 evalValue :: Data a => Value a -> Either Error FValScalar
 evalValue = \case
   ValInteger i mkp -> FValScalarInt <$> evalInt i mkp

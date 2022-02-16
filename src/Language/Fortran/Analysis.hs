@@ -18,7 +18,7 @@ import           Language.Fortran.AST
 import           Language.Fortran.LValue
 import           Language.Fortran.Intrinsics    ( getIntrinsicDefsUses
                                                 , allIntrinsics )
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Util.Position ( SrcSpan )
 
 import Prelude hiding (exp)

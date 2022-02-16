@@ -1,11 +1,8 @@
-{-# LANGUAGE DerivingStrategies, DeriveAnyClass, DeriveGeneric, DeriveDataTypeable #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Language.Fortran.Analysis.Types.FortranVars where
 
 import           Language.Fortran.AST
 import           Language.Fortran.Analysis
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
 
 import           GHC.Generics

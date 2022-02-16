@@ -6,7 +6,8 @@
 
 module Language.Fortran.Repr.Value where
 
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
+import           Language.Fortran.AST.Boz ( Boz )
 
 import           Data.Int                       ( Int8, Int16, Int32, Int64 )
 import           Data.Data                      ( Data, Typeable )
@@ -16,6 +17,7 @@ import           Text.PrettyPrint.GenericPretty ( Out(..) )
 
 data FValScalar
   = FValScalarInt FValInt
+  | FValScalarBoz Boz
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
 

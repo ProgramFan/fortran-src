@@ -2,7 +2,7 @@
 
 module Language.Fortran.Repr.Coerce where
 
-import           Language.Fortran.Repr.Type
+import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
 
 coerceScalar :: FValScalar -> FTypeScalar -> Either String FValScalar

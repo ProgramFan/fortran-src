@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, RankNTypes #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Language.Fortran.Analysis.Util where
 

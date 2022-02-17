@@ -7,6 +7,7 @@ import Test.Hspec.QuickCheck
 import Test.QuickCheck
 
 import Language.Fortran.Repr.Type
+import Language.Fortran.Repr.Type.Scalar
 import Language.Fortran.AST
 import Language.Fortran.Version
 

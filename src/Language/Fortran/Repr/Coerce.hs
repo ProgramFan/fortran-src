@@ -11,7 +11,7 @@ coerceScalar (FValScalarInt fvint) (FTypeScalarInt ftint) =
 scalar _ _ = Left "unimplemented scalar coerce"
 
 coerceInt :: FValInt -> FTypeInt -> Either String FValInt
-coerceInt (FValInt vt vv) t =
+coerceInt (FValInt _vt vv) t =
     if   fValIntIsWellBounded coerced
     then Right coerced
     else Left "tried to coerce int to a too-small type"

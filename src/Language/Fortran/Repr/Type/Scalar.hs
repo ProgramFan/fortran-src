@@ -30,13 +30,13 @@ data FTypeInt
     deriving stock    (Eq, Ord, Show, Data, Enum, Typeable, Generic)
     deriving anyclass (Out, Binary)
 
-parseKindInt :: Integer -> Maybe FTypeInt
+parseKindInt :: String -> Maybe FTypeInt
 parseKindInt = \case
-  1 -> Just FTypeInt1
-  2 -> Just FTypeInt2
-  4 -> Just FTypeInt4
-  8 -> Just FTypeInt8
-  _ -> Nothing
+  "1" -> Just FTypeInt1
+  "2" -> Just FTypeInt2
+  "4" -> Just FTypeInt4
+  "8" -> Just FTypeInt8
+  _   -> Nothing
 
 prettyKindInt :: Integral a => FTypeInt -> a
 prettyKindInt = \case FTypeInt1 -> 1

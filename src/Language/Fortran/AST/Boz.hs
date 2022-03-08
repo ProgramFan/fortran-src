@@ -32,6 +32,9 @@ import qualified Data.List as List
 import qualified Data.Char as Char
 import qualified Numeric   as Num
 
+import           Data.Bits
+import qualified Data.ByteString as BS
+
 -- | A Fortran BOZ literal constant.
 --
 -- The prefix defines the characters allowed in the string:
@@ -122,3 +125,38 @@ bozIdentical b1 b2 =
                                   (BozPrefixO,   BozPrefixO)   -> True
                                   (BozPrefixZ{}, BozPrefixZ{}) -> True
                                   _                            -> False
+
+bozAsTwosCompInt :: Boz -> Integer
+bozAsTwosCompInt = bs2i . bozAsBytestring
+
+bozAsBytestring :: Boz -> BS.ByteString
+bozAsBytestring = const $ BS.pack [0xFF]
+
+bs2i :: BS.ByteString -> Integer
+bs2i b
+   | sign = go b - 2 ^ (BS.length b * 8)
+   | otherwise = go b
+   where
+      go = BS.foldl' (\i b -> (i `shiftL` 8) + fromIntegral b) 0
+      sign = BS.index b 0 > 127
+
+i2bs :: Integer -> BS.ByteString
+i2bs x
+   | x == 0 = BS.singleton 0
+   | x < 0 = i2bs $ 2 ^ (8 * bytes) + x
+   | otherwise = BS.reverse $ BS.unfoldr go x
+   where
+      bytes = (integerLogBase 2 (abs x) + 1) `quot` 8 + 1
+      go i = if i == 0 then Nothing
+                       else Just (fromIntegral i, i `shiftR` 8)
+
+integerLogBase :: Integer -> Integer -> Int
+integerLogBase b i =
+     if i < b then
+        0
+     else
+        -- Try squaring the base first to cut down the number of divisions.
+        let l = 2 * integerLogBase (b*b) i
+            doDiv :: Integer -> Int -> Int
+            doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
+        in  doDiv (i `div` (b^l)) l

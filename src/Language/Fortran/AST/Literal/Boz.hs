@@ -55,7 +55,7 @@ data BozPrefix
   | BozPrefixO              -- ^ octal
   | BozPrefixZ Conforming   -- ^ hex, including nonstandard @x@
     deriving stock    (Eq, Show, Generic, Data, Typeable, Ord)
-    deriving anyclass (NFData, Out)
+    deriving anyclass (NFData, Out, Binary)
 
 data Conforming = Conforming | Nonconforming
     deriving stock    (Eq, Show, Generic, Data, Typeable, Ord)

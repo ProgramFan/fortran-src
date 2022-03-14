@@ -2,6 +2,7 @@ module Language.Fortran.Analysis.Types.Internal where
 
 import           Language.Fortran.AST
 import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Eval.Op ( Op' )
 import           Language.Fortran.Analysis
 import           Language.Fortran.Version
 import           Language.Fortran.Util.Position
@@ -39,12 +40,12 @@ data InferConfig = InferConfig
   --   character length for a non-character data type will treat it as a kind
   --   parameter. In both cases, a warning is logged (nonstandard syntax).
 
-  , inferConfigConstantIntrinsics :: Map Name ()
+  , inferConfigConstantIntrinsics :: Map Name Op'
   -- ^ Existence of and implementation for intrinsic functions to use during
   --   PARAMETER evaluation.
-  --
+
   , inferConfigLangVersion :: FortranVersion
   , inferConfigIntrinsics  :: IntrinsicsTable
-  } deriving (Eq, Show)
+  }
 
 type InferFunc t = t -> Infer ()

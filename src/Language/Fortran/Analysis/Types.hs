@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- TODO rename to Types.Common I think
+
 module Language.Fortran.Analysis.Types
   ( module Language.Fortran.Analysis.Types
   , TypeEnv
@@ -60,7 +62,7 @@ analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ d
 
   mapM_ Traverse.intrinsicsExp $ allExpressions  pf
   mapM_ Traverse.programUnit   $ allProgramUnits pf
-  mapM_ Traverse.declarator    $ allDeclarators  pf
+  mapM_ Traverse.declarator    $ allDeclarators  pf -- TODO needed? rewritten from @recordArrayDecl@
   mapM_ Traverse.statement     $ allStatements   pf
 
   -- Gather types for known entry points.

@@ -11,7 +11,7 @@ module Language.Fortran.Analysis
   , lhsExprs, isLExpr, allVars, analyseAllLhsVars, analyseAllLhsVars1, allLhsVars
   , blockVarUses, blockVarDefs
   , BB, BBNode, BBGr(..), bbgrMap, bbgrMapM, bbgrEmpty
-  , TransFunc, TransFuncM )
+  , TransFunc, TransFuncM, printIDType, printScalarType )
 where
 
 import           Language.Fortran.AST
@@ -27,7 +27,7 @@ import Data.Data
 import Data.Graph.Inductive (Node, empty)
 import Data.Graph.Inductive.PatriciaTree (Gr)
 import Text.PrettyPrint.GenericPretty
-import Text.PrettyPrint hiding (empty, isEmpty)
+import Text.PrettyPrint hiding (empty, isEmpty, (<>) )
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Binary
@@ -106,6 +106,13 @@ data IDType = IDType
 
 instance Out    IDType
 instance Binary IDType
+
+printIDType :: IDType -> String
+printIDType (IDType st ct) =
+    case (st, ct) of
+      (Nothing, Nothing)         -> "<no type info>"
+      (Just ty, Just CTVariable) -> printScalarType ty
+      _                          -> show st <> " | " <> show ct
 
 -- | Information about potential / actual constant expressions.
 data Constant

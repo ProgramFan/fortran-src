@@ -4,31 +4,52 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveAnyClass     #-}
 
+{-
+Some values store some info also used at the type level. This is done where that
+info can be used on the value level to influence how the value is used e.g. to
+check bounds.
+-}
+
 module Language.Fortran.Repr.Value where
 
 import           Language.Fortran.Repr.Type.Scalar
-import           Language.Fortran.AST.Boz ( Boz )
+import           Language.Fortran.AST.Literal.Boz ( Boz )
 
 import           Data.Int                       ( Int8, Int16, Int32, Int64 )
 import           Data.Data                      ( Data, Typeable )
 import           GHC.Generics                   ( Generic )
 import           Data.Binary                    ( Binary )
 import           Text.PrettyPrint.GenericPretty ( Out(..) )
+import           Data.Text                      ( Text )
+import qualified Data.Text                      as Text
+import           Data.Void
+
+data FValArray = FValArray
+  { fValArrayValues :: [FValScalar]
+  } deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
+    deriving anyclass (Out, Binary)
+
+data FVal = FValScalar FValScalar | FValArray' FValArray
+    deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
+    deriving anyclass (Out, Binary)
 
 data FValScalar
-  = FValScalarInt FValInt
-  | FValScalarBoz Boz
+  = FValScalarInt     FValInt
+  | FValScalarReal    FValReal
+  | FValScalarLogical Bool
+  | FValScalarComplex ()
+  | FValScalarBoz     Boz
+  | FValScalarString  Text
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
 
 -- TODO hide constructor, make smart constructor
 -- | Fortran INTEGER value.
-data FValInt = FValInt FTypeInt Integer
-    deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
+data FValInt = FValInt
+  { fvalIntKind :: FTypeInt
+  , fvalInt     :: Integer
+  } deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
-
-fvalInt :: FValInt -> Integer
-fvalInt (FValInt _ i) = i
 
 -- | A bounds-checked operation on 'ty'. True is valid, False is invalid.
 type CheckedOp ty = ty -> ty -> (ty, Bool)
@@ -59,3 +80,17 @@ toRuntimeRepr (FValInt t x) =
       FTypeInt2 -> toInteger ((fromInteger x) :: Int16)
       FTypeInt4 -> toInteger ((fromInteger x) :: Int32)
       FTypeInt8 -> toInteger ((fromInteger x) :: Int64)
+
+-- TODO no distinguishing between REAL(4) and REAL(8) on value level
+-- could make a sum type instead
+data FValReal = FValReal FTypeReal Double
+    deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
+    deriving anyclass (Out, Binary)
+
+-- orphan instances...
+instance Out Text where
+    doc = doc . Text.unpack
+    docPrec = const doc
+instance Out Void where
+    doc = const mempty
+    docPrec = const doc

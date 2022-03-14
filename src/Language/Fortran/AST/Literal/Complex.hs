@@ -3,7 +3,7 @@
 module Language.Fortran.AST.Literal.Complex where
 
 import Language.Fortran.AST.Common ( Name )
-import Language.Fortran.AST.Literal ( KindParam )
+import Language.Fortran.AST.Literal ( KindParam' )
 import Language.Fortran.AST.Literal.Real
 import Language.Fortran.Util.Position ( SrcSpan )
 
@@ -47,8 +47,8 @@ instance Annotated       ComplexLit
 -- We specifically avoid supporting that by defining complex parts without being
 -- mutually recursive with 'Expression'.
 data ComplexPart a
-  = ComplexPartReal   a SrcSpan RealLit (Maybe (KindParam a)) -- ^ signed real lit
-  | ComplexPartInt    a SrcSpan String  (Maybe (KindParam a)) -- ^ signed int  lit
+  = ComplexPartReal   a SrcSpan RealLit (Maybe (KindParam' a)) -- ^ signed real lit
+  | ComplexPartInt    a SrcSpan String  (Maybe (KindParam' a)) -- ^ signed int  lit
   | ComplexPartNamed  a SrcSpan Name                          -- ^ named constant
     deriving stock    (Eq, Show, Data, Typeable, Generic, Functor)
     deriving anyclass (NFData, Out)

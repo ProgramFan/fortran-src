@@ -112,7 +112,7 @@ main = do
           tenv      = combinedTypeEnv mods
           pvm       = combinedParamVarMap mods
 
-      --let runTypes = analyseAndCheckTypesWithEnv tenv . analyseRenamesWithModuleMap mmap . initAnalysis
+      let runTypes = analyseAndCheckTypesWithEnv tenv . analyseRenamesWithModuleMap mmap . initAnalysis
       let runRenamer = stripAnalysis . rename . analyseRenamesWithModuleMap mmap . initAnalysis
           runBBlocks pf = showBBlocks pf' ++ "\n\n" ++ showDataFlow pf'
             where pf' = analyseParameterVars pvm . analyseBBlocks . analyseRenamesWithModuleMap mmap . initAnalysis $ pf
@@ -133,12 +133,11 @@ main = do
           print $ Parser.collectTokens Free.lexer'  $ initParseStateFree "<unknown>" version contents
         Lex        -> ioError $ userError $ usageInfo programName options
         Parse      -> pp parsedPF
-{-
-        Typecheck  -> let (pf, _, errs) = runTypes parsedPF in
-                        printTypeErrors errs >> printTypes (extractTypeEnv pf)
-        Typecheck  -> let (pf, _, errs) = runTypes (parserF mods contents path) in
-                        printTypeErrors errs >> printTypes (regenerateTypeEnv pf)
--}
+        Typecheck  -> do
+          let (pf, tenvOut, errs) = runTypes parsedPF
+          printTypeErrors errs
+          printTypes tenvOut
+          printTypes (regenerateTypeEnv pf)
         Rename     -> pp $ runRenamer parsedPF
         BBlocks    -> putStrLn $ runBBlocks parsedPF
         SuperGraph -> putStrLn $ runSuperGraph parsedPF
@@ -325,11 +324,14 @@ showTypes tenv =
       \ (name, IDType { idVType = vt, idCType = ct }) ->
         printf "%s\t\t%s %s\n" name (drop 1 $ maybe "  -" show vt) (drop 2 $ maybe "   " show ct)
 printTypes :: TypeEnv -> IO ()
-printTypes = putStrLn . showTypes
+printTypes = putStrLn . showTypes'
 showTypeErrors :: [TypeError] -> String
 showTypeErrors errs = unlines [ show ss ++ ": " ++ msg | (msg, ss) <- sortBy (comparing snd) errs ]
 printTypeErrors :: [TypeError] -> IO ()
 printTypeErrors = putStrLn . showTypeErrors
+
+showTypes' :: TypeEnv -> String
+showTypes' = intercalate "\n" . map (\(name, ty) -> printf "%s\t%s" name (printIDType ty)) . M.toList
 
 data Action
   = Lex | Parse | Typecheck | Rename | BBlocks | SuperGraph | Reprint | DumpModFile | Compile

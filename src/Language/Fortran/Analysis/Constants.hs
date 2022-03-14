@@ -24,6 +24,7 @@ import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Repr.Value
 import qualified Language.Fortran.Repr.Eval.Scalar  as Eval
+import           Language.Fortran.Repr.Eval.Op ( Op' )
 
 import           Data.Data
 import qualified Data.Map                   as Map
@@ -34,8 +35,8 @@ import           Data.Function              ( on )
 import qualified Data.List                          as List
 import           Data.Maybe                         ( catMaybes )
 
-type ConstMap          = Map Name FValScalar
-type IntrinsicsEvalMap = Map Name ()
+type ConstMap = Map Name FValScalar
+type OpMap    = Map Name Op'
 
 data Error
   = ErrorParameterReassigned Name
@@ -54,7 +55,7 @@ data Error
 -- TODO: F90 ISO pg.193 init expr. Their definition appears a little wider than
 -- params, but it's pretty much what we're going for?
 gatherConsts
-    :: (MonadReader IntrinsicsEvalMap m, Data a)
+    :: (MonadReader OpMap m, Data a)
     => ProgramFile (Analysis a) -> m (Either Error ConstMap)
 gatherConsts pf = do
     let decls = extractParamDecls (allStatements pf)
@@ -82,7 +83,7 @@ sameConstructor :: Data a => a -> a -> Bool
 sameConstructor = (==) `on` toConstr
 
 handleParamDecl
-    :: (MonadState ConstMap m, MonadReader IntrinsicsEvalMap m, Data a)
+    :: (MonadState ConstMap m, MonadReader OpMap m, Data a)
     => Declarator (Analysis a) -> m (Either Error FValScalar)
 handleParamDecl (Declarator _ _ varExpr declType _ mInitExpr) =
     case declType of
@@ -99,8 +100,8 @@ handleParamDecl (Declarator _ _ varExpr declType _ mInitExpr) =
           Right val -> assignConst (varName varExpr) val >> return (Right val)
     makeEvalEnv = do
         cm <- get
-        im <- ask
-        return $ Eval.Env cm im
+        ops <- ask
+        return $ Eval.Env cm ops
 
 assignConst :: MonadState ConstMap m => Name -> FValScalar -> m (Either Error ())
 assignConst var val = do

@@ -982,10 +982,13 @@ instance Pretty (ComplexLit a) where
       where realPart = pprint' v (complexLitRealPart c)
             imagPart = pprint' v (complexLitImagPart c)
 
-instance Pretty (KindParam a) where
+instance Pretty (KindParam' a) where
+    pprint' v (KindParam _ _ kp) = pprint' v kp
+
+instance Pretty KindParam where
     pprint' _ kp = text "_" <> text kp'
-      where kp' = case kp of KindParamInt _ _ i -> i
-                             KindParamVar _ _ v -> v
+      where kp' = case kp of KindParamInt i -> i
+                             KindParamVar v -> v
 
 instance Pretty (ComplexPart a) where
     pprint' v = \case

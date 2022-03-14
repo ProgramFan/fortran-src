@@ -63,11 +63,15 @@ data FTypeReal
     deriving stock    (Eq, Ord, Show, Enum, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
 
-parseKindReal :: Integer -> Maybe FTypeReal
+parseKindReal :: String -> Maybe FTypeReal
 parseKindReal = \case
-  4 -> Just FTypeReal4
-  8 -> Just FTypeReal8
-  _ -> Nothing
+  "4" -> Just FTypeReal4
+  "8" -> Just FTypeReal8
+  _   -> Nothing
+
+prettyKindReal :: Integral a => FTypeReal -> a
+prettyKindReal = \case FTypeReal4 -> 4
+                       FTypeReal8 -> 8
 
 -- | Fortran COMPLEX type (= 2 REALs).
 data FTypeComplex
@@ -108,3 +112,14 @@ data CharLen
 
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
+
+printScalarType :: FTypeScalar -> String
+printScalarType = \case
+  FTypeScalarInt     k -> "INTEGER" <> bracket (show (prettyKindInt  k))
+  FTypeScalarReal    k -> "REAL"    <> bracket (show (prettyKindReal k))
+  --FTypeScalarComplex FTypeComplex
+  FTypeScalarLogical k -> "LOGICAL" <> bracket (show (prettyKindInt  k))
+  --FTypeScalarChar    FTypeChar
+  ty -> show ty
+  where
+    bracket x = "(" <> x <> ")"

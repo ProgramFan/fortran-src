@@ -33,6 +33,7 @@ module Language.Fortran.AST
   , Expression(..)
   , Index(..)
   , Value(..)
+  , KindParam'(..)
   , KindParam(..)
   , ComplexPart(..)
   , UnaryOp(..)
@@ -620,9 +621,9 @@ data Index a =
 
 -- | Values and literals.
 data Value a
-  = ValInteger           String  (Maybe (KindParam a))
+  = ValInteger      String  (Maybe (KindParam' a))
   -- ^ The string representation of an integer literal
-  | ValReal         RealLit (Maybe (KindParam a))
+  | ValReal         RealLit (Maybe (KindParam' a))
   -- ^ The string representation of a real literal
   | ValComplex      (ComplexLit a)
   -- ^ The real and imaginary parts of a complex literal @(real, imag)@.
@@ -636,7 +637,7 @@ data Value a
   -- ^ The name of a variable
   | ValIntrinsic    Name
   -- ^ The name of a built-in function
-  | ValLogical      Bool (Maybe (KindParam a))
+  | ValLogical      Bool (Maybe (KindParam' a))
   -- ^ A boolean value
   | ValOperator     String
   -- ^ User-defined operators in interfaces

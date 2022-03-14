@@ -116,6 +116,4 @@ class JoinType t where
   joinType :: t -> t -> Maybe t
 
 instance JoinType FTypeInt where
-  joinType x y | x == y = Just x
-  -- Use the pretty printer to get the maximum size of integer, and convert back to the type repr
-  joinType x y = parseKindInt $ show $ prettyKindInt x `max` prettyKindInt y
+  joinType x y = Just $ max x y

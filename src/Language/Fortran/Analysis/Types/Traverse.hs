@@ -47,6 +47,7 @@ programUnit pu@(PUSubroutine _ _ _ _ _ blocks _) | Named n <- puName pu = do
     sequence_ [ recordEntryPoint n (varName v) Nothing | (StEntry _ _ v _ _) <- allStatements block ]
 programUnit _                                           = return ()
 
+-- TODO needed? rewritten from @recordArrayDecl@
 declarator :: (MonadState InferState m, Data a) => Declarator (Analysis a) -> m ()
 declarator (Declarator _ _ v declType _ _) =
     case declType of
@@ -119,21 +120,26 @@ handleDeclarator
     -> [Attribute (Analysis a)]
     -> Declarator (Analysis a)
     -> m ()
-handleDeclarator _ _ (Declarator _ _ _ ArrayDecl{} _ _) =
-    error "handle array declarator unimplemented"
-handleDeclarator ts attrs decl@(Declarator _ _ v ScalarDecl _ _) =
+handleDeclarator _ts _attrs decl@(Declarator _ _ _ ArrayDecl{} _ _) =
+    typeError "TODO ignoring array declarator" (getSpan decl)
+handleDeclarator ts attrs decl@(Declarator _ _ v ScalarDecl mLenExpr _) = do
+    -- get 'ConstructType'
     handleCType >>= \case
       Just CTParameter -> handleScalarConstDecl ts decl
       _ -> return ()
+    -- get type
+    tryRecordScalarType v' mLenExpr ts
   where
-    wrapCType cty = recordCType cty (varName v) >> return (Just cty)
+    v' = varName v
+    wrapCType cty = recordCType cty v' >> return (Just cty)
     handleCType
       | any isAttrExternal attrs = wrapCType CTExternal
-      | Just (AttrDimension _ _ _dims) <- List.find isAttrDimension attrs =
-          error "handle dims in declarator"
+      | Just (AttrDimension _ _ _dims) <- List.find isAttrDimension attrs = do
+          typeError "TODO ignoring dims in array declarator" (getSpan decl)
+          return Nothing
       | any isAttrParameter attrs = wrapCType CTParameter
       | otherwise = do
-          getRecordedType (varName v) >>= \case
+          getRecordedType v' >>= \case
             Just (IDType _ (Just cty)) ->
               if cty /= CTIntrinsic then wrapCType cty else wrapCType CTVariable
             _ -> wrapCType CTVariable
@@ -148,7 +154,7 @@ tryRecordScalarType v mDeclExpr ts = do
     tryDeriveTypeVia (Derive.fromDeclaration mDeclExpr) ts $ recordScalarType v
 
 -- | Try to record the type and initial value of a scalar constant (PARAMETER)
---   declaration.
+--   declaration. The caller must provide a scalar 'Declarator'.
 --
 -- TODO use len if character
 handleScalarConstDecl
@@ -157,9 +163,10 @@ handleScalarConstDecl
     -> Declarator (Analysis a)
     -> m ()
 handleScalarConstDecl _ (Declarator _ _ _ _ _ Nothing) =
-    -- Should be an impossible parse, so the function has been used incorrectly.
+    -- Should be a prohibited parse.
     error "PARAMETER declarator missing initialization expression"
 handleScalarConstDecl _ (Declarator _ _ _ ArrayDecl{}  _ _) =
+    -- Programmer error.
     error "scalar const handler received array const"
 handleScalarConstDecl ts (Declarator _ ss v ScalarDecl mLenExpr (Just initExpr)) = do
     Derive.fromDeclaration mLenExpr ts >>= \case

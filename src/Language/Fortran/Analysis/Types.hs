@@ -53,7 +53,7 @@ analyseAndCheckTypesWithEnv env pf = (pf', tenv, terrs)
 
 analyseTypesWithEnv' :: Data a => TypeEnv -> ProgramFile (Analysis a) -> (ProgramFile (Analysis a), InferState)
 analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ do
-  cm <- lift (withReaderT inferConfigConstantIntrinsics $ gatherConsts pf) >>= \case
+  cm <- lift (withReaderT inferConfigConstantOps $ gatherConsts pf) >>= \case
           Right cm -> return cm
           Left err -> do
             typeError ("bad constants: " <> show err) (getSpan pf)

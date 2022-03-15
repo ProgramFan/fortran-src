@@ -6,7 +6,7 @@ TODO
   * should I be returning a type as well? I mean, I should be computing one.
 -}
 
-module Language.Fortran.Repr.Eval.Scalar where
+module Language.Fortran.Repr.Eval where
 
 import           Language.Fortran.AST
 import           Language.Fortran.AST.Literal.Real
@@ -26,7 +26,7 @@ import           Data.Maybe ( fromMaybe )
 
 -- | Immutable expression evaluation environment.
 data Env = Env
-  { envVars :: Map Name FValScalar
+  { envVars :: Map Name FVal
   , envOps  :: Map Name Op'
   }
 
@@ -48,17 +48,17 @@ data Error
   | ErrorNonIntegerKind String
     deriving (Eq, Show)
 
-eval :: Data a => Env -> Expression a -> Either Error FValScalar
+eval :: Data a => Env -> Expression a -> Either Error FVal
 eval env = \case
   ExpValue _a _ss ve ->
     case ve of
       ValVariable v -> evalLookup env v
 
-      ValInteger i mkp -> FValScalarInt     <$> evalInt  env i (maybeKP "4" mkp)
-      ValReal    r mkp -> FValScalarReal    <$> evalReal env r (maybeKP "4" mkp)
-      ValLogical b mkp -> FValScalarLogical <$> evalBool env b (maybeKP "4" mkp)
+      ValInteger i mkp -> FValScalar . FValScalarInt     <$> evalInt  env i (maybeKP "4" mkp)
+      ValReal    r mkp -> FValScalar . FValScalarReal    <$> evalReal env r (maybeKP "4" mkp)
+      ValLogical b mkp -> FValScalar . FValScalarLogical <$> evalBool env b (maybeKP "4" mkp)
 
-      ValString s -> return $ FValScalarString $ Text.pack s
+      ValString s -> return $ FValScalar $ FValScalarString $ Text.pack s
       _ -> Left $ ErrorUnsupportedValue $ show $ Data.toConstr ve
 
   ExpUnary _a _ss uop e -> do
@@ -118,29 +118,28 @@ evalBool env b = \case
 evalLookupKind :: Env -> Name -> Either Error String
 evalLookupKind env kpV =
     evalLookup env kpV >>= \case
-      FValScalarInt (FValInt _ kpI) -> return $ show kpI
+      FValScalar (FValScalarInt (FValInt _ kpI)) -> return $ show kpI
       val -> Left $ ErrorNonIntegerKind (show val)
 
-evalLookup :: Env -> Name -> Either Error FValScalar
+evalLookup :: Env -> Name -> Either Error FVal
 evalLookup env v =
     case Map.lookup v (envVars env) of
       Nothing  -> Left $ ErrorVarUndefined v
       Just val -> Right val
 
-evalUnaryOp :: UnaryOp -> FValScalar -> Either Error FValScalar
+evalUnaryOp :: UnaryOp -> FVal -> Either Error FVal
 evalUnaryOp uop v = undefined
 
-evalBinaryOp :: Env -> BinaryOp -> FValScalar -> FValScalar -> Either Error FValScalar
+evalBinaryOp :: Env -> BinaryOp -> FVal -> FVal -> Either Error FVal
 evalBinaryOp env bop v1 v2 =
     case bop of
       Addition ->
         case Map.lookup "+" (envOps env) of
           Nothing -> Left $ ErrorNoSuchOp "+"
           Just op ->
-            case Op.op op [FValScalar v1, FValScalar v2] of
+            case Op.op op [v1, v2] of
               Left  err -> Left $ ErrorOpError err
-              Right res ->
-                let FValScalar res' = res in return res'
+              Right res -> return res
       _ -> undefined
 
 {-
@@ -160,5 +159,5 @@ evalBinaryOp bop (FValScalarInt v1@(FValInt ty1 val1)) (FValScalarInt v2@(FValIn
 evalBinaryOp _ _ _ = Left $ ErrorUnsupportedValue ""
 -}
 
-evalOp :: Env -> Name -> [Expression a] -> Either Error FValScalar
-evalOp env op args = undefined
+evalOp :: Env -> Name -> [Expression a] -> Either Error FVal
+evalOp _env _op _args = undefined

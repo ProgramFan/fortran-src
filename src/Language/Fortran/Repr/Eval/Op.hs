@@ -45,16 +45,16 @@ opPlus = Op{..}
         let a1 = args !! 0
             a2 = args !! 1
         case (a1, a2) of
-          (FTypeScalar _a1ts, FTypeArray' _a2ta) -> error "scalar x array"
-          (FTypeArray' _a1ta, FTypeScalar _a2ts) -> error "scalar x array"
-          (FTypeArray' a1ta, FTypeArray' a2ta) -> do
-            case sameShape (fTypeArrayShape a1ta) (fTypeArrayShape a2ta) of
-              Nothing -> err "array  x array (same shape)"
+          (FType _a1sty Nothing,        FType _a2sty (Just _a2ashp)) -> error "scalar x array"
+          (FType _a1sty (Just _a1ashp), FType _a2sty Nothing) -> error "scalar x array"
+          (FType _a1sty (Just a1ashp), FType _a2sty (Just a2ashp)) -> do
+            case sameShape a1ashp a2ashp of
+              Nothing -> err "array x array (same shape)"
               Just e  -> err $ "arrays diff shape: " <> e
-          (FTypeScalar a1ts, FTypeScalar a2ts) -> do
-            case (a1ts, a2ts) of
+          (FType a1sty Nothing, FType a2sty Nothing) -> do
+            case (a1sty, a2sty) of
               (FTypeScalarInt i1, FTypeScalarInt i2) ->
-                return $ FTypeScalar $ FTypeScalarInt $ max i1 i2
+                return $ FType (FTypeScalarInt (max i1 i2)) Nothing
               _ -> err "opPlus: unsupported types"
     err :: forall a m. MonadError Error m => String -> m a
     err = throwError . ErrorStr

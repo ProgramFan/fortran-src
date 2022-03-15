@@ -331,7 +331,7 @@ printTypeErrors :: [TypeError] -> IO ()
 printTypeErrors = putStrLn . showTypeErrors
 
 showTypes' :: TypeEnv -> String
-showTypes' = intercalate "\n" . map (\(name, ty) -> printf "%s\t%s" name (printIDType ty)) . M.toList
+showTypes' = intercalate "\n" . map (\(name, ty) -> printf "%s\t%s" name (prettyIDType ty)) . M.toList
 
 data Action
   = Lex | Parse | Typecheck | Rename | BBlocks | SuperGraph | Reprint | DumpModFile | Compile

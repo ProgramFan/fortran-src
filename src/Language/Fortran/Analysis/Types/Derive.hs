@@ -10,16 +10,21 @@ import           Language.Fortran.Util.Position
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Repr.Type.Scalar
-import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
+import           Language.Fortran.Repr.Value
+import qualified Language.Fortran.Repr.Eval as Eval
+import           Language.Fortran.Repr.Kind
 
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader
+import           Data.Data ( Data )
 
 data Error
   = ErrorInvalidSyntax String
   | ErrorEval Eval.Error
   | ErrorTypeKindNotSupported String Integer -- TODO ?
   | ErrorUnimplemented String
+  | ErrorKindParamNotInt FVal
+  | ErrorKindParamUnsupported String
     deriving (Eq, Show)
 
 -- | Attempt to derive a variable's 'ScalarTy' from the relevant parts of its
@@ -49,7 +54,7 @@ data Error
 -- behaviour.
 fromDeclaration
     :: forall a m
-    . (MonadState InferState m, MonadReader InferConfig m)
+    . (MonadState InferState m, MonadReader InferConfig m, Data a)
     => Maybe (Expression a) -> TypeSpec a -> m (Either Error FTypeScalar)
 fromDeclaration mLenExpr (TypeSpec _ _ bt mSel) =
     case bt of TypeCharacter -> go chooseLenExpr
@@ -60,12 +65,12 @@ fromDeclaration mLenExpr (TypeSpec _ _ bt mSel) =
 -- | Named 'fromDeclaration' shortcut.
 fromTypeSpec
     :: forall a m
-    . (MonadState InferState m, MonadReader InferConfig m)
+    . (MonadState InferState m, MonadReader InferConfig m, Data a)
     => TypeSpec a -> m (Either Error FTypeScalar)
 fromTypeSpec = fromDeclaration Nothing
 
 fromBaseTypeMaybeKindParam
-    :: Monad m
+    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
     => BaseType -> Maybe (Expression a) -> m (Either Error FTypeScalar)
 fromBaseTypeMaybeKindParam bt mkp =
     case bt of
@@ -76,7 +81,20 @@ fromBaseTypeMaybeKindParam bt mkp =
       TypeInteger ->
         case mkp of
           Nothing -> return $ Right $ FTypeScalarInt FTypeInt4 -- TODO default kind selection
-          Just _  -> return $ Left $ ErrorUnimplemented "int with kind param"
+          Just kp -> do
+            evalEnv <- makeEvalEnv
+            case Eval.eval evalEnv kp of
+              Left  err -> return $ Left $ ErrorEval err
+              Right val -> do
+                case val of
+                  FValScalar (FValScalarInt i) ->
+                    -- note that we piggyback the regular evaluation for kinds,
+                    -- but ignore the evaluated kind itself (since in the
+                    -- Fortran compilers I know about, kinds are 1-16)
+                    case intAsIntKind i of
+                      Nothing -> return $ Left $ ErrorKindParamUnsupported $ show $ fvalInt i
+                      Just k  -> return $ Right $ FTypeScalarInt k
+                  _ -> return $ Left $ ErrorKindParamNotInt val
       -- etc...
       _ -> return $ Left $ ErrorUnimplemented $ "unhandled basetype: " <> show bt
 

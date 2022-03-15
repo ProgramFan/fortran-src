@@ -40,7 +40,7 @@ data InferConfig = InferConfig
   --   character length for a non-character data type will treat it as a kind
   --   parameter. In both cases, a warning is logged (nonstandard syntax).
 
-  , inferConfigConstantIntrinsics :: Map Name Op'
+  , inferConfigConstantOps :: Map Name Op'
   -- ^ Existence of and implementation for intrinsic functions to use during
   --   PARAMETER evaluation.
 

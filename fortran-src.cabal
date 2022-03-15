@@ -100,8 +100,9 @@ library
       Language.Fortran.Parser.ParserUtils
       Language.Fortran.PrettyPrint
       Language.Fortran.Repr.Coerce
+      Language.Fortran.Repr.Eval
       Language.Fortran.Repr.Eval.Op
-      Language.Fortran.Repr.Eval.Scalar
+      Language.Fortran.Repr.Kind
       Language.Fortran.Repr.Type
       Language.Fortran.Repr.Type.Array
       Language.Fortran.Repr.Type.Scalar

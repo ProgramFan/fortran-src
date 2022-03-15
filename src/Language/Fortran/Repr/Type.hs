@@ -13,8 +13,6 @@ module Language.Fortran.Repr.Type where
 import Language.Fortran.Repr.Type.Scalar
 import Language.Fortran.Repr.Type.Array
 
-import           Data.Int
-
 import           Data.Data                      ( Data, Typeable )
 import           GHC.Generics                   ( Generic )
 import           Data.Binary                    ( Binary )
@@ -39,11 +37,17 @@ let's quietly pretend I didn't.
 -}
 
 -- | Fortran type.
-data FType
-  = FTypeScalar FTypeScalar
-  | FTypeArray' FTypeArray
-    deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
+data FType = FType
+  { fTypeScalar :: FTypeScalar
+  , fTypeArray  :: Maybe ArrayShape -- TODO likely replace with "custom" Maybe
+  } deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
+
+prettyType :: FType -> String
+prettyType (FType sty mashp) =
+    case mashp of
+      Nothing    -> prettyScalarType sty
+      Just _ashp -> undefined
 
 {-
 

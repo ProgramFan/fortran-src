@@ -2,6 +2,7 @@ module Language.Fortran.Analysis.Types.FortranVars where
 
 import           Language.Fortran.AST
 import           Language.Fortran.Analysis
+import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
 
@@ -62,7 +63,10 @@ st1 mc v idt =
     fvt =
         case idVType idt of
           Nothing -> error "typeenv stored a var with no scalar type"
-          Just st -> scalarTypeToFortranVarsType st
+          Just ty ->
+            case fTypeArray ty of
+              Nothing    -> scalarTypeToFortranVarsType $ fTypeScalar ty
+              Just _ashp -> error "can't convert array types to fortran-vars repr yet"
 
 scalarTypeToFortranVarsType :: FTypeScalar -> FVType
 scalarTypeToFortranVarsType = \case

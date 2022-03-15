@@ -14,6 +14,8 @@
 --
 -- F90 ISO spec is great for this. See pg.38.
 
+-- The F2008 spec specifies constants as scalars, so we do the same.
+
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -23,7 +25,7 @@ import           Language.Fortran.AST
 import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Repr.Value
-import qualified Language.Fortran.Repr.Eval.Scalar  as Eval
+import qualified Language.Fortran.Repr.Eval as Eval
 import           Language.Fortran.Repr.Eval.Op ( Op' )
 
 import           Data.Data
@@ -97,9 +99,13 @@ handleParamDecl (Declarator _ _ varExpr declType _ mInitExpr) =
         evalEnv <- makeEvalEnv
         case Eval.eval evalEnv initExpr of
           Left  err -> return $ Left $ ErrorEval err
-          Right val -> assignConst (varName varExpr) val >> return (Right val)
+          Right val ->
+            case val of
+              FValScalar sval  -> assignConst (varName varExpr) sval >> return (Right sval)
+              FValArray' _aval -> error "evaluated result was not an array lol. how"
     makeEvalEnv = do
-        cm <- get
+        scm <- get
+        let cm = Map.map FValScalar scm
         ops <- ask
         return $ Eval.Env cm ops
 

@@ -11,14 +11,14 @@ module Language.Fortran.Analysis
   , lhsExprs, isLExpr, allVars, analyseAllLhsVars, analyseAllLhsVars1, allLhsVars
   , blockVarUses, blockVarDefs
   , BB, BBNode, BBGr(..), bbgrMap, bbgrMapM, bbgrEmpty
-  , TransFunc, TransFuncM, printIDType, printScalarType )
+  , TransFunc, TransFuncM, prettyIDType )
 where
 
 import           Language.Fortran.AST
 import           Language.Fortran.LValue
 import           Language.Fortran.Intrinsics    ( getIntrinsicDefsUses
                                                 , allIntrinsics )
-import           Language.Fortran.Repr.Type.Scalar
+import           Language.Fortran.Repr.Type
 import           Language.Fortran.Util.Position ( SrcSpan )
 
 import Prelude hiding (exp)
@@ -100,18 +100,18 @@ instance Out    ConstructType
 instance Binary ConstructType
 
 data IDType = IDType
-  { idVType :: Maybe FTypeScalar
+  { idVType :: Maybe FType
   , idCType :: Maybe ConstructType }
   deriving (Ord, Eq, Show, Data, Typeable, Generic)
 
 instance Out    IDType
 instance Binary IDType
 
-printIDType :: IDType -> String
-printIDType (IDType st ct) =
+prettyIDType :: IDType -> String
+prettyIDType (IDType st ct) =
     case (st, ct) of
       (Nothing, Nothing)         -> "<no type info>"
-      (Just ty, Just CTVariable) -> printScalarType ty
+      (Just ty, Just CTVariable) -> prettyType ty
       _                          -> show st <> " | " <> show ct
 
 -- | Information about potential / actual constant expressions.

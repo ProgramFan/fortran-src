@@ -7,9 +7,10 @@ import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Analysis.Types.Internal
 import qualified Language.Fortran.Analysis.Types.Derive     as Derive
+import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
-import qualified Language.Fortran.Repr.Eval.Scalar          as Eval
+import qualified Language.Fortran.Repr.Eval                 as Eval
 import qualified Language.Fortran.Repr.Coerce               as Coerce
 import           Language.Fortran.Intrinsics
 
@@ -151,7 +152,7 @@ tryRecordScalarType
     => Name -> Maybe (Expression (Analysis a)) -> TypeSpec (Analysis a)
     -> m ()
 tryRecordScalarType v mDeclExpr ts = do
-    tryDeriveTypeVia (Derive.fromDeclaration mDeclExpr) ts $ recordScalarType v
+    tryDeriveTypeVia (Derive.fromDeclaration mDeclExpr) ts $ \sty -> recordType v (FType sty Nothing)
 
 -- | Try to record the type and initial value of a scalar constant (PARAMETER)
 --   declaration. The caller must provide a scalar 'Declarator'.
@@ -172,16 +173,17 @@ handleScalarConstDecl ts (Declarator _ ss v ScalarDecl mLenExpr (Just initExpr))
     Derive.fromDeclaration mLenExpr ts >>= \case
       Left  err -> do
         typeError ("error while deriving a type: " <> show err) ss
-      Right fty -> do
-        recordScalarType (varName v) fty
+      Right sty -> do
+        recordScalarType (varName v) sty
         evalExpr initExpr >>= \case
           Left  err  ->
             typeError ("failed to evaluate initialization expression: " <> show err) (getSpan initExpr)
           Right fval -> do
-            case Coerce.coerceScalar fval fty of
-              Left  err   -> do
+            let FValScalar fval' = fval
+            case Coerce.coerceScalar fval' sty of
+              Left  err    -> do
                 typeError ("error while coercing PARAMETER initial value to its type: " <> show err) (getSpan initExpr)
-              Right fval' -> assignConst (varName v) fval' ss
+              Right fval'' -> assignConst (varName v) fval'' ss
 
 {-
 -- | Create a structure env from the list of fields and add it to the InferState
@@ -226,15 +228,12 @@ data Error = ErrorEval Eval.Error deriving (Eq, Show)
 -- Doesn't touch state.
 evalExpr
     :: (MonadState InferState m, MonadReader InferConfig m, Data a)
-    => Expression a -> m (Either Error FValScalar)
+    => Expression a -> m (Either Error FVal)
 evalExpr e = do
     evalEnv <- makeEvalEnv
     case Eval.eval evalEnv e of
       Left  err -> return $ Left $ ErrorEval err
       Right val -> return $ Right val
-  where makeEvalEnv = do cm <- gets constMap
-                         im <- asks inferConfigConstantIntrinsics
-                         return $ Eval.Env cm im
 
 assignConst :: MonadState InferState m => Name -> FValScalar -> SrcSpan -> m ()
 assignConst var val ss = do

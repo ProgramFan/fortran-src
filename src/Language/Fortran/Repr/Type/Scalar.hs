@@ -22,6 +22,9 @@ data FTypeScalar
     deriving anyclass (Out, Binary)
 
 -- | Fortran INTEGER type.
+--
+-- TODO gfortran supports INTEGER(16). Bit more awkward: no comparable built-in
+-- type in C or Haskell.
 data FTypeInt
   = FTypeInt1
   | FTypeInt2
@@ -37,6 +40,14 @@ parseKindInt = \case
   "4" -> Just FTypeInt4
   "8" -> Just FTypeInt8
   _   -> Nothing
+
+parseKindInt' :: (Num a, Eq a) => a -> Maybe FTypeInt
+parseKindInt' = \case
+  1 -> Just FTypeInt1
+  2 -> Just FTypeInt2
+  4 -> Just FTypeInt4
+  8 -> Just FTypeInt8
+  _ -> Nothing
 
 prettyKindInt :: Integral a => FTypeInt -> a
 prettyKindInt = \case FTypeInt1 -> 1
@@ -113,8 +124,8 @@ data CharLen
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
 
-printScalarType :: FTypeScalar -> String
-printScalarType = \case
+prettyScalarType :: FTypeScalar -> String
+prettyScalarType = \case
   FTypeScalarInt     k -> "INTEGER" <> bracket (show (prettyKindInt  k))
   FTypeScalarReal    k -> "REAL"    <> bracket (show (prettyKindReal k))
   --FTypeScalarComplex FTypeComplex

@@ -1,22 +1,35 @@
--- TODO dislike having to use String
--- TODO unlike fortran-src, we're not using each expression's unique label.
--- would be good for efficiency
---
--- SymValMap has to be built up via Statements (parameter declarations,
--- assignments). Then can be used in expressions. fortran-src currently does
--- these the other way round -- unclear if swapping them will impact anything
--- (appears unlikely?)
---
--- The overall approach here is rewriting the fortran-vars eval story (some
--- constructors in SymbolTable, an Eval module) into a classy interface that
--- provides the eval function, which SymbolTable can implement, and we can
--- improve fortran-src to also do similar work.
---
--- F90 ISO spec is great for this. See pg.38.
+{- | Explicit constant evaluation.
 
--- The F2008 spec specifies constants as scalars, so we do the same.
+Fortran has the concept of constants, which are defined at the start of a
+procedure and not redefined during. These are confusingly referred to as
+"parameters". This module holds definitions for evaluating these, intended to
+run before the main analysis to build up a list of constants to use during it.
+This is required, because using constants in type information -- specifically,
+kinds and array dimensions -- is permitted.
 
-{-# LANGUAGE OverloadedStrings   #-}
+Note that this isn't constant folding. We are evaluating constant expressions
+(expressions required by the language specification to be constant). This module
+Is concerned with traversing the AST to obtain the statements containing
+constant declarations. Evaluation is handled in 'Language.Fortran.Repr.Eval'.
+
+Fortran specs (at least F90 and F2008) restrict constants to scalars, not
+arrays, so we do the same.
+-}
+
+{-
+SymValMap has to be built up via Statements (parameter declarations,
+assignments). Then can be used in expressions. fortran-src currently does these
+the other way round -- unclear if swapping them will impact anything (appears
+unlikely?)
+
+TODO
+  * unlike fortran-src, we're not using each expression's unique label.
+    would be good for efficiency
+  * could be safer, more efficient if we separated initial non-exec
+    statements from following exec statements (since this analysis is only
+    interested in those initial declarations)
+-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.Fortran.Analysis.Constants where
@@ -43,6 +56,7 @@ type OpMap    = Map Name Op'
 data Error
   = ErrorParameterReassigned Name
   | ErrorEval Eval.Error
+  | ErrorEvalReturnedArray FValArray
     deriving (Eq, Show)
 
 -- | Gather labeled constants (PARAMETERS).
@@ -69,6 +83,7 @@ gatherConsts pf = do
 extractParamDecls :: Data a => [Statement (Analysis a)] -> [Declarator (Analysis a)]
 extractParamDecls = concat . catMaybes . map tryExtractParamDecl
 
+-- shortcut via 'sameConstructor' using 'Data' instance
 tryExtractParamDecl :: Data a => Statement (Analysis a) -> Maybe [Declarator (Analysis a)]
 tryExtractParamDecl = \case
   StParameter _ _ decls -> ret decls
@@ -80,9 +95,8 @@ tryExtractParamDecl = \case
   where
     ret = Just . aStrip
     fakeAttrParam = AttrParameter undefined undefined
-
-sameConstructor :: Data a => a -> a -> Bool
-sameConstructor = (==) `on` toConstr
+    sameConstructor :: Data a => a -> a -> Bool
+    sameConstructor = (==) `on` toConstr
 
 handleParamDecl
     :: (MonadState ConstMap m, MonadReader OpMap m, Data a)
@@ -101,8 +115,8 @@ handleParamDecl (Declarator _ _ varExpr declType _ mInitExpr) =
           Left  err -> return $ Left $ ErrorEval err
           Right val ->
             case val of
-              FValScalar sval  -> assignConst (varName varExpr) sval >> return (Right sval)
-              FValArray' _aval -> error "evaluated result was not an array lol. how"
+              FValScalar sval -> assignConst (varName varExpr) sval >> return (Right sval)
+              FValArray' aval -> return $ Left $ ErrorEvalReturnedArray aval
     makeEvalEnv = do
         scm <- get
         let cm = Map.map FValScalar scm

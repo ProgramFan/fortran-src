@@ -32,7 +32,10 @@ inferState0 = InferState
 inferConfig0 :: FortranVersion -> InferConfig
 inferConfig0 v = InferConfig
   { inferConfigAcceptNonCharLengthAsKind = True
-  , inferConfigConstantOps               = Map.singleton "+" Op.opPlus
+  , inferConfigConstantOps               = Map.fromList
+    [ ("+", Op.opPlus)
+    , ("-", Op.opMinus)
+    ]
   , inferConfigLangVersion               = v
   , inferConfigIntrinsics                = getVersionIntrinsics v
   }

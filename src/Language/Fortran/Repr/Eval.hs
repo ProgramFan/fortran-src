@@ -10,7 +10,6 @@ module Language.Fortran.Repr.Eval where
 
 import           Language.Fortran.AST
 import           Language.Fortran.AST.Literal.Real
-import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
 import qualified Language.Fortran.Repr.Eval.Op as Op
@@ -21,7 +20,6 @@ import           Data.Data ( Data )
 import qualified Data.Map  as Map
 import           Data.Map  ( Map )
 import qualified Data.Text as Text
-import           Data.Text ( Text )
 import           Data.Maybe ( fromMaybe )
 
 -- | Immutable expression evaluation environment.
@@ -32,15 +30,12 @@ data Env = Env
 
 data Error
   = ErrorVarUndefined Name
-  | ErrorNoSuchOp String
+  | ErrorUnsupportedOp String
   | ErrorUnsupportedExpression String
   | ErrorOpError Op.Error
 
   | ErrorUnsupportedValue String -- ^ yet-unsupported 'Value' constructor
   | ErrorUnsupportedCommonType String String
-  | ErrorUnsupportedBinOp String
-  -- ^ No intrinsic with the given name in the intrinsic map. May indicate you
-  --   used a non-compile time intrinsic.
 
   | ErrorNoSuchKindForType String String
   -- ^ The kind provided is invalid for the given kinded scalar type.
@@ -48,15 +43,60 @@ data Error
   | ErrorNonIntegerKind String
     deriving (Eq, Show)
 
+{-
+evalWithKindParamVia
+    :: Env -> String
+    -> (Integer -> Maybe kindTag) -> kindTag -> Maybe KindParam
+    -> Either Error kindTag
+evalWithKindParamVia env prettyTypeName parseKind defKind = \case
+  Nothing -> return defKind
+  Just (KindParamInt kpIStr) -> go (read kpIStr)
+  Just (KindParamVar kpV)    -> evalLookupKind env kpV >>= go
+  where go k = case parseKind k of
+                 Nothing -> Left $ ErrorNoSuchKindForType k prettyTypeName
+                 Just k'  -> return k'
+-}
+
+-- | Resolve a 'KindParam'' to a typed kind tag using the given function.
+--
+-- You must also provide a default kind tag to use in the case that there is no
+-- kind parameter.
+resolveKindParamTo
+    :: Env -> String
+    -> kindTag -> (String -> Maybe kindTag) -> Maybe (KindParam' a)
+    -> Either Error kindTag
+resolveKindParamTo env prettyTypeName defKind parseKind = \case
+  Nothing                                   -> return defKind
+  Just (KindParam _ _ (KindParamInt kpInt)) -> parseKind' kpInt
+  Just (KindParam _ _ (KindParamVar kpVar)) -> do
+    -- the 'show' here is sensible: kinds are primarily tags => strings, we have
+    -- to put them into integers just to do arithmetic. the alternatives are to
+    -- 'read' on the other case instead, or provide both parsers
+    show <$> evalLookupKind env kpVar >>= parseKind'
+  where
+    parseKind' kpInt =
+        case parseKind kpInt of
+          Nothing -> Left $ ErrorNoSuchKindForType kpInt prettyTypeName
+          Just k -> return k
+
 eval :: Data a => Env -> Expression a -> Either Error FVal
 eval env = \case
   ExpValue _a _ss ve ->
     case ve of
       ValVariable v -> evalLookup env v
 
-      ValInteger i mkp -> FValScalar . FValScalarInt     <$> evalInt  env i (maybeKP "4" mkp)
-      ValReal    r mkp -> FValScalar . FValScalarReal    <$> evalReal env r (maybeKP "4" mkp)
-      ValLogical b mkp -> FValScalar . FValScalarLogical <$> evalBool env b (maybeKP "4" mkp)
+      -- kinded numeric literals: resolve kind, possibly bundle with value
+      ValInteger i  mkp -> do
+        k <- resolveKindParamTo env "INTEGER" FTypeInt4  parseKindInt  mkp
+        return $ FValScalar $ FValScalarInt  $ FValInt  k (read i)
+      ValReal    rl mkp -> do
+        k <- resolveKindParamTo env "REAL"    FTypeReal4 parseKindReal mkp
+        return $ FValScalar $ FValScalarReal $ FValReal k (readRealLit rl)
+      ValLogical b  mkp -> do
+        -- resolve kind param, but throw it away (we store a true 'Bool' for
+        -- LOGICALs)
+        _ <- resolveKindParamTo env "LOGICAL" FTypeInt4  parseKindInt  mkp
+        return $ FValScalar $ FValScalarLogical b
 
       ValString s -> return $ FValScalar $ FValScalarString $ Text.pack s
       _ -> Left $ ErrorUnsupportedValue $ show $ Data.toConstr ve
@@ -76,49 +116,16 @@ eval env = \case
 
   e -> Left $ ErrorUnsupportedExpression $ show $ Data.toConstr e
 
-maybeKP :: String -> Maybe (KindParam' a) -> KindParam
-maybeKP defKP = \case Nothing                 -> KindParamInt defKP
-                      Just (KindParam _ _ kp) -> kp
-
-evalInt :: Env -> String -> KindParam -> Either Error FValInt
-evalInt env iStr = \case
-  KindParamInt kpIStr -> go kpIStr
-  KindParamVar kpV -> evalLookupKind env kpV >>= go
-  where
-    go x = case parseKindInt x of
-             Nothing -> Left $ ErrorNoSuchKindForType x "INTEGER"
-             Just k  -> Right $ FValInt k (read iStr)
-
-evalReal :: Env -> RealLit -> KindParam -> Either Error FValReal
-evalReal env rl = \case
-  KindParamInt kpIStr -> go kpIStr
-  KindParamVar kpV -> evalLookupKind env kpV >>= go
-  where
-    go x = case parseKindReal x of
-             Nothing -> Left $ ErrorNoSuchKindForType x "REAL"
-             Just k  -> Right $ FValReal k (readRealLit rl)
-
--- we do all the kind computing, but actually just throw it away (because we
--- don't need it on value level)
-evalBool :: Env -> Bool -> KindParam -> Either Error Bool
-evalBool env b = \case
-  KindParamInt kpIStr -> go kpIStr
-  KindParamVar kpV -> evalLookupKind env kpV >>= go
-  where
-    go x = case parseKindInt x of
-             Nothing -> Left $ ErrorNoSuchKindForType x "LOGICAL"
-             Just k  -> Right b
-
 -- Note that we do not permit BOZs here, because the syntax you'd have to
 -- use is forbidden. You can't assign a BOZ to a variable (it's an untyped
 -- compile-time construct), and the kind parameter syntax is limited, so
 -- you can't write e.g. @123_x'10'@. (This goes for gfortran, at least.)
 --
 -- There shouldn't be a problem if you did want to permit them, though.
-evalLookupKind :: Env -> Name -> Either Error String
+evalLookupKind :: Env -> Name -> Either Error Integer
 evalLookupKind env kpV =
     evalLookup env kpV >>= \case
-      FValScalar (FValScalarInt (FValInt _ kpI)) -> return $ show kpI
+      FValScalar (FValScalarInt (FValInt _ kpI)) -> return kpI
       val -> Left $ ErrorNonIntegerKind (show val)
 
 evalLookup :: Env -> Name -> Either Error FVal
@@ -128,19 +135,22 @@ evalLookup env v =
       Just val -> Right val
 
 evalUnaryOp :: UnaryOp -> FVal -> Either Error FVal
-evalUnaryOp uop v = undefined
+evalUnaryOp _uop _v = undefined
 
 evalBinaryOp :: Env -> BinaryOp -> FVal -> FVal -> Either Error FVal
 evalBinaryOp env bop v1 v2 =
     case bop of
-      Addition ->
-        case Map.lookup "+" (envOps env) of
-          Nothing -> Left $ ErrorNoSuchOp "+"
+      Addition    -> evalAs "+"
+      Subtraction -> evalAs "-"
+      _ -> Left $ ErrorUnsupportedOp $ show bop
+  where
+    evalAs opName =
+        case Map.lookup opName (envOps env) of
+          Nothing -> Left $ ErrorUnsupportedOp opName
           Just op ->
             case Op.op op [v1, v2] of
               Left  err -> Left $ ErrorOpError err
               Right res -> return res
-      _ -> undefined
 
 {-
 evalBinaryOp bop (FValScalarInt v1@(FValInt ty1 val1)) (FValScalarInt v2@(FValInt ty2 val2)) =

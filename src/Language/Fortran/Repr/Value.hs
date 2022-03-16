@@ -37,7 +37,7 @@ data FValScalar
   = FValScalarInt     FValInt
   | FValScalarReal    FValReal
   | FValScalarLogical Bool
-  | FValScalarComplex ()
+  | FValScalarComplex FValComplex
   | FValScalarBoz     Boz
   | FValScalarString  Text
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
@@ -72,6 +72,9 @@ fValIntSafeBinOp op (FValInt t1 v1) (FValInt t2 v2) = (FValInt t v, isInBound)
 fValIntSafeAdd :: CheckedOp FValInt
 fValIntSafeAdd = fValIntSafeBinOp (+)
 
+fValIntSafeMinus :: CheckedOp FValInt
+fValIntSafeMinus = fValIntSafeBinOp (-)
+
 toRuntimeRepr :: FValInt -> FValInt
 toRuntimeRepr (FValInt t x) =
   FValInt t $
@@ -86,6 +89,24 @@ toRuntimeRepr (FValInt t x) =
 data FValReal = FValReal FTypeReal Double
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
+
+fValRealAdd :: FValReal -> FValReal -> FValReal
+fValRealAdd (FValReal t1 r1) (FValReal t2 r2) = FValReal (max t1 t2) (r1+r2)
+
+fValRealMinus :: FValReal -> FValReal -> FValReal
+fValRealMinus (FValReal t1 r1) (FValReal t2 r2) = FValReal (max t1 t2) (r1-r2)
+
+data FValComplex = FValComplex FTypeReal Double Double
+    deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
+    deriving anyclass (Out, Binary)
+
+fValComplexAdd :: FValComplex -> FValComplex -> FValComplex
+fValComplexAdd (FValComplex t1 c1r c1i) (FValComplex t2 c2r c2i) =
+    FValComplex (max t1 t2) (c1r+c2r) (c1i+c2i)
+
+fValComplexMinus :: FValComplex -> FValComplex -> FValComplex
+fValComplexMinus (FValComplex t1 c1r c1i) (FValComplex t2 c2r c2i) =
+    FValComplex (max t1 t2) (c1r-c2r) (c1i-c2i)
 
 -- orphan instances...
 instance Out Text where

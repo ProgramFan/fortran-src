@@ -38,6 +38,8 @@ import           Language.Fortran.AST
 import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
+import           Language.Fortran.Repr.Value.Array
 import qualified Language.Fortran.Repr.Eval as Eval
 import           Language.Fortran.Repr.Eval.Op ( Op' )
 

@@ -12,6 +12,7 @@ import           Language.Fortran.AST
 import           Language.Fortran.AST.Literal.Real
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
 import qualified Language.Fortran.Repr.Eval.Op as Op
 import           Language.Fortran.Repr.Eval.Op ( Op' )
 

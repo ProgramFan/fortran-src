@@ -11,6 +11,7 @@ import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
 import qualified Language.Fortran.Repr.Eval as Eval
 import           Language.Fortran.Repr.Kind
 

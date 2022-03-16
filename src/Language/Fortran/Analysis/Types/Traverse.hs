@@ -10,6 +10,7 @@ import qualified Language.Fortran.Analysis.Types.Derive     as Derive
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
 import qualified Language.Fortran.Repr.Eval                 as Eval
 import qualified Language.Fortran.Repr.Coerce               as Coerce
 import           Language.Fortran.Intrinsics

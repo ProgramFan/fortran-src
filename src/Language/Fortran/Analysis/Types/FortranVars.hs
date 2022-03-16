@@ -5,6 +5,7 @@ import           Language.Fortran.Analysis
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
 
 import           GHC.Generics
 import           Data.Data

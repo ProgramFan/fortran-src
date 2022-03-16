@@ -3,7 +3,7 @@
 module Language.Fortran.Repr.Coerce where
 
 import           Language.Fortran.Repr.Type.Scalar
-import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
 
 coerceScalar :: FValScalar -> FTypeScalar -> Either String FValScalar
 coerceScalar (FValScalarInt fvint) (FTypeScalarInt ftint) =

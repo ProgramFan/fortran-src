@@ -1,7 +1,7 @@
 module Language.Fortran.Analysis.Types.Internal where
 
 import           Language.Fortran.AST
-import           Language.Fortran.Repr.Value
+import           Language.Fortran.Repr.Value.Scalar
 import           Language.Fortran.Repr.Eval.Op ( Op' )
 import           Language.Fortran.Analysis
 import           Language.Fortran.Version

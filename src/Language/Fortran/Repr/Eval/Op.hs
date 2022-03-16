@@ -9,7 +9,9 @@ Fortran intrinsic procedures can have many, many properties:
   * in gfortran, work differently depending on compiler flags
 
 We choose to pack everything into a simple operator type, and handle these
-properties via combinators and a large error sum type.
+properties via combinators and a large error sum type. Binary operators, unary
+operators and function call-style intrinsic procedures are all put into the same
+type.
 -}
 
 {-# LANGUAGE KindSignatures, DataKinds, RankNTypes #-}
@@ -21,6 +23,7 @@ import Language.Fortran.Repr.Type
 import Language.Fortran.Repr.Type.Scalar
 import Language.Fortran.Repr.Type.Array
 import Language.Fortran.Repr.Value
+import Language.Fortran.Repr.Value.Scalar
 
 import GHC.TypeLits
 import Control.Monad.Except
@@ -76,12 +79,12 @@ opMinus = opNumericBin valOp typeOp
             return $ FValScalarReal $ fValRealMinus r1 r2
           (FValScalarComplex c1, FValScalarComplex c2) -> do
             return $ FValScalarComplex $ fValComplexMinus c1 c2
-          _ -> err $ "opPlus: not yet supported: given scalars:" <> show (sv1, sv2)
+          _ -> err $ "opMinus: not yet supported: given scalars:" <> show (sv1, sv2)
     typeOp sty1 sty2 = do
         case (sty1, sty2) of
           (FTypeScalarInt i1, FTypeScalarInt i2) ->
             return $ FTypeScalarInt $ max i1 i2
-          _ -> err "opPlus: unsupported scalar types"
+          _ -> err "opMinus: unsupported scalar types"
     err :: String -> Either String a
     err = Left
 
@@ -99,6 +102,8 @@ opNumericBin valOp typeOp = Op{..}
             case a1s `valOp` a2s of
               Left  e -> err e
               Right x -> return $ FValScalar x
+          --(FValArray a1s, FValScalar a2s) ->
+          _ -> err "mada desu"
     opTy args = do
         let a1 = args !! 0
             a2 = args !! 1
@@ -118,21 +123,3 @@ opNumericBin valOp typeOp = Op{..}
 
 sameShape :: ArrayShape -> ArrayShape -> Maybe String
 sameShape _arr1 _arr2 = Just "sameShape: not yet implemented"
-
-{-
-data Fixity
-  = Prefix -- ^ functions ("non-symbolic" operators?), unary operators
-  | Infix  -- ^ only makes sense for binary operators
-
--- 'a' is type of argument
-data Op (s :: Symbol) (n :: Nat) (x :: Fixity) a = Op
-  { opName :: Text
-  , ???
-
-_ :: MonadError Error m => Op f n a -> [a] -> m a
-
-data Error = ErrorOther String
-
-opPlus :: Op "+" 2 'Infix
-opPlus =
--}

@@ -38,20 +38,6 @@ data Error
   | ErrorNonIntegerKind String
     deriving (Eq, Show)
 
-{-
-evalWithKindParamVia
-    :: Env -> String
-    -> (Integer -> Maybe kindTag) -> kindTag -> Maybe KindParam
-    -> Either Error kindTag
-evalWithKindParamVia env prettyTypeName parseKind defKind = \case
-  Nothing -> return defKind
-  Just (KindParamInt kpIStr) -> go (read kpIStr)
-  Just (KindParamVar kpV)    -> evalLookupKind env kpV >>= go
-  where go k = case parseKind k of
-                 Nothing -> Left $ ErrorNoSuchKindForType k prettyTypeName
-                 Just k'  -> return k'
--}
-
 -- | Resolve a 'KindParam'' to a typed kind tag using the given function.
 --
 -- You must also provide a default kind tag to use in the case that there is no

@@ -10,6 +10,7 @@ import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
+import           Language.Fortran.Repr.Type.Array
 import qualified Language.Fortran.Repr.Eval as Eval
 import qualified Language.Fortran.Repr.Eval.Op as Op
 import           Language.Fortran.Repr.Value
@@ -67,6 +68,14 @@ recordScalarType n sty =
     changeFunc = \case
       Nothing   -> Just $ IDType (Just sty) Nothing Nothing
       Just idty -> Just $ idty { idScalarType = Just sty }
+
+recordArrayInfo :: MonadState InferState m => Name -> ArrayShape -> m ()
+recordArrayInfo n aty =
+    modify $ \s -> s { environ = Map.alter changeFunc n (environ s) }
+  where
+    changeFunc = \case
+      Nothing   -> Just $ IDType Nothing (Just aty) Nothing
+      Just idty -> Just $ idty { idArrayInfo = Just aty }
 
 recordEntryPoint :: MonadState InferState m => Name -> Name -> Maybe Name -> m ()
 recordEntryPoint fn en mRetName = modify $ \ s -> s { entryPoints = Map.insert en (fn, mRetName) (entryPoints s) }

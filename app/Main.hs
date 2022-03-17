@@ -134,9 +134,10 @@ main = do
         Lex        -> ioError $ userError $ usageInfo programName options
         Parse      -> pp parsedPF
         Typecheck  -> do
-          let (pf, tenvOut, errs) = runTypes parsedPF
+          let (pf, tenvOut, consts, errs) = runTypes parsedPF
           printTypeErrors errs
           printTypes tenvOut
+          print consts
           printTypes (regenerateTypeEnv pf)
         Rename     -> pp $ runRenamer parsedPF
         BBlocks    -> putStrLn $ runBBlocks parsedPF

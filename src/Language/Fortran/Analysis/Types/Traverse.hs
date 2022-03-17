@@ -9,6 +9,7 @@ import           Language.Fortran.Analysis.Types.Internal
 import qualified Language.Fortran.Analysis.Types.Resolve    as Resolve
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
+import           Language.Fortran.Repr.Type.Array
 import           Language.Fortran.Repr.Value
 import           Language.Fortran.Repr.Value.Scalar
 import qualified Language.Fortran.Repr.Eval                 as Eval
@@ -120,35 +121,34 @@ statement (StDimension _ _ declAList) =
 
 statement _ = return ()
 
+-- TODO
 handleDeclarator
     :: (MonadState InferState m, MonadReader InferConfig m, Data a)
     => TypeSpec (Analysis a)
     -> [Attribute (Analysis a)]
     -> Declarator (Analysis a)
     -> m ()
-handleDeclarator _ts _attrs decl@(Declarator _ _ _ ArrayDecl{} _ _) =
-    typeError "TODO ignoring array declarator" (getSpan decl)
-handleDeclarator ts attrs decl@(Declarator _ _ v ScalarDecl mLenExpr _) = do
-    -- get 'ConstructType'
-    handleCType >>= \case
-      Just CTParameter -> handleScalarConstDecl ts decl
-      _ -> return ()
-    -- get type
-    tryRecordScalarType v' mLenExpr ts
-  where
-    v' = varName v
-    wrapCType cty = recordCType cty v' >> return (Just cty)
-    handleCType
-      | any isAttrExternal attrs = wrapCType CTExternal
-      | Just (AttrDimension _ _ _dims) <- List.find isAttrDimension attrs = do
-          typeError "TODO ignoring dims in array declarator" (getSpan decl)
-          return Nothing
-      | any isAttrParameter attrs = wrapCType CTParameter
-      | otherwise = do
-          getRecordedType v' >>= \case
-            Just (IDType _ _ (Just cty)) ->
-              if cty /= CTIntrinsic then wrapCType cty else wrapCType CTVariable
-            _ -> wrapCType CTVariable
+handleDeclarator ts attrs (Declarator _ _ v decl mLenExpr _) =
+    case (decl, List.find isAttrDimension attrs) of
+      (ArrayDecl _dims, Just (AttrDimension _ _ _dims')) -> do
+        error "strange parse: dimension info in both attribute and main declaration"
+      (ArrayDecl dims, _) -> do
+        aty <- handleArrayInfo v' (aStrip dims)
+        recordArrayInfo v' aty
+        tryRecordScalarType v' mLenExpr ts
+      (ScalarDecl, Just (AttrDimension _ _ dims)) -> do
+        aty <- handleArrayInfo v' (aStrip dims)
+        recordArrayInfo v' aty
+        tryRecordScalarType v' mLenExpr ts
+      (ScalarDecl, _) -> do
+        tryRecordScalarType v' mLenExpr ts
+  where v' = varName v
+
+handleArrayInfo
+    :: (MonadState InferState m, MonadReader InferConfig m)
+    => Name -> [DimensionDeclarator a]
+    -> m ArrayShape
+handleArrayInfo = undefined
 
 -- | Try to resolve the scalar type information for a variable and record if
 --   successful.

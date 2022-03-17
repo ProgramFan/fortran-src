@@ -1,6 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- TODO rename to Types.Common I think
+{- TODO
+  * rename to Types.Common I think
+  * return more generated info (ConstMap, from more functions)
+-}
 
 module Language.Fortran.Analysis.Types
   ( module Language.Fortran.Analysis.Types
@@ -44,14 +47,20 @@ analyseTypesWithEnv env pf = (pf', tenv)
 -- environment mapping names to type information and return any type
 -- errors found; provided with a starting type environment.
 analyseAndCheckTypesWithEnv
-  :: Data a => TypeEnv -> ProgramFile (Analysis a) -> (ProgramFile (Analysis a), TypeEnv, [TypeError])
-analyseAndCheckTypesWithEnv env pf = (pf', tenv, terrs)
+  :: Data a
+  => TypeEnv -> ProgramFile (Analysis a)
+  -> (ProgramFile (Analysis a), TypeEnv, ConstMap, [TypeError])
+analyseAndCheckTypesWithEnv env pf = (pf', tenv, consts, terrs)
   where
     (pf', endState) = analyseTypesWithEnv' env pf
-    tenv            = environ endState
-    terrs           = typeErrors endState
+    tenv   = environ    endState
+    terrs  = typeErrors endState
+    consts = constMap   endState
 
-analyseTypesWithEnv' :: Data a => TypeEnv -> ProgramFile (Analysis a) -> (ProgramFile (Analysis a), InferState)
+analyseTypesWithEnv'
+    :: Data a
+    => TypeEnv -> ProgramFile (Analysis a)
+    -> (ProgramFile (Analysis a), InferState)
 analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ do
   cm <- lift (withReaderT inferConfigConstantOps $ gatherConsts pf) >>= \case
           Right cm -> return cm
@@ -67,12 +76,13 @@ analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ d
 
   -- Gather types for known entry points.
   eps <- gets (Map.toList . entryPoints)
-  forM_ eps $ \ (eName, (fName, mRetName)) -> do
+  forM_ eps $ \ (eName, (fName, _mRetName)) -> do
     mFType <- getRecordedType fName
     case mFType of
       Just idty -> do
         modify $ \s -> s { environ = Map.insert eName idty (environ s) }
         -- FIXME: what about functions that return arrays?
+        -- TODO
         --maybe (return ()) (error "Entry points with result variables unsupported" >> recordMType fVType Nothing) mRetName
       _                           -> return ()
 

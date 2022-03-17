@@ -1,10 +1,4 @@
-{-| Fortran expression evaluation.
-
-TODO
-  * inefficient kind defaulting: could go straight to constructor, instead of
-    through string to then parse
-  * should I be returning a type as well? I mean, I should be computing one.
--}
+-- | Fortran expression evaluation.
 
 module Language.Fortran.Repr.Eval where
 

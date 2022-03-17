@@ -1,9 +1,13 @@
--- | Most, but not all deriving functions can report type errors. So most of
--- these functions are in the 'Infer' monad.
+{- | Definitions for resolving Fortran types during analysis.
+
+Named constants interfere with types in Fortran, due to being allowed in array
+dimensions and kind parameters. This module handles both the simple case of
+literal constants, and the more complex case of named constants.
+-}
 
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.Fortran.Analysis.Types.Derive where
+module Language.Fortran.Analysis.Types.Resolve where
 
 import           Language.Fortran.AST
 import           Language.Fortran.Util.Position

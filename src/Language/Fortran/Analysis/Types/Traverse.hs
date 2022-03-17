@@ -6,7 +6,7 @@ import           Language.Fortran.Analysis
 import           Language.Fortran.Analysis.Util
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Analysis.Types.Internal
-import qualified Language.Fortran.Analysis.Types.Derive     as Derive
+import qualified Language.Fortran.Analysis.Types.Resolve    as Resolve
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Repr.Type.Scalar
 import           Language.Fortran.Repr.Value
@@ -31,11 +31,11 @@ programUnit pu@(PUFunction _ _ mRetType _ _ _ mRetVar blocks _)
     recordCType CTFunction n
     case (mRetType, mRetVar) of
       (Just ts@(TypeSpec _ _ _ _), Just v) -> do
-        tryDeriveTypeVia Derive.fromTypeSpec ts $ \ft -> do
+        tryResolveTypeVia Resolve.fromTypeSpec ts $ \ft -> do
           recordScalarType n           ft
           recordScalarType (varName v) ft
       (Just ts@(TypeSpec _ _ _ _), _)      -> do
-        tryDeriveTypeVia Derive.fromTypeSpec ts $ \ft -> do
+        tryResolveTypeVia Resolve.fromTypeSpec ts $ \ft -> do
           recordScalarType n ft
       _                                        -> return ()
     -- record entry points for later annotation
@@ -95,8 +95,12 @@ statement (StExpressionAssign _ _ (ExpSubscript _ _ v ixAList) _)
   | all isIxSingle (aStrip ixAList) = do
     mIDType <- getExprRecordedType v
     case mIDType of
-      Just (IDType _ (Just CTArray{})) -> return ()                -- do nothing, it's already known to be an array
-      _                                -> recordCType CTFunction (varName v) -- assume it's a function statement
+      Just (IDType _ Just{} _) ->
+        -- do nothing, it's already known to be an array
+        return ()
+      _                        ->
+        -- assume it's a function statement
+        recordCType CTFunction (varName v)
 
 -- FIXME: if StFunctions can only be identified after types analysis
 -- is complete and disambiguation is performed, then how do we get
@@ -142,18 +146,18 @@ handleDeclarator ts attrs decl@(Declarator _ _ v ScalarDecl mLenExpr _) = do
       | any isAttrParameter attrs = wrapCType CTParameter
       | otherwise = do
           getRecordedType v' >>= \case
-            Just (IDType _ (Just cty)) ->
+            Just (IDType _ _ (Just cty)) ->
               if cty /= CTIntrinsic then wrapCType cty else wrapCType CTVariable
             _ -> wrapCType CTVariable
 
--- | Try to derive the scalar type information for a variable and record if
+-- | Try to resolve the scalar type information for a variable and record if
 --   successful.
 tryRecordScalarType
     :: (MonadState InferState m, MonadReader InferConfig m, Data a)
     => Name -> Maybe (Expression (Analysis a)) -> TypeSpec (Analysis a)
     -> m ()
 tryRecordScalarType v mDeclExpr ts = do
-    tryDeriveTypeVia (Derive.fromDeclaration mDeclExpr) ts $ \sty -> recordType v (FType sty Nothing)
+    tryResolveTypeVia (Resolve.fromDeclaration mDeclExpr) ts $ \sty -> recordType v (FType sty Nothing)
 
 -- | Try to record the type and initial value of a scalar constant (PARAMETER)
 --   declaration. The caller must provide a scalar 'Declarator'.
@@ -171,7 +175,7 @@ handleScalarConstDecl _ (Declarator _ _ _ ArrayDecl{}  _ _) =
     -- Programmer error.
     error "scalar const handler received array const"
 handleScalarConstDecl ts (Declarator _ ss v ScalarDecl mLenExpr (Just initExpr)) = do
-    Derive.fromDeclaration mLenExpr ts >>= \case
+    Resolve.fromDeclaration mLenExpr ts >>= \case
       Left  err -> do
         typeError ("error while deriving a type: " <> show err) ss
       Right sty -> do
@@ -211,16 +215,16 @@ handleStructureItem mt StructStructure{} = pure mt
 
 --------------------------------------------------------------------------------
 
--- Wrapper around Derive functions to use the 'Spanned' instance from the
--- 'TypeSpec' you pass. (Generalized to all 'Spanned' because why not.)
-tryDeriveTypeVia
+-- Wrapper around type resolution functions to use the 'Spanned' instance from
+-- the 'TypeSpec' you pass. (Generalized to all 'Spanned' because why not.)
+tryResolveTypeVia
     :: (MonadState InferState m, Spanned a)
-    => (a -> m (Either Derive.Error FTypeScalar))
+    => (a -> m (Either Resolve.Error FTypeScalar))
     -> a
     -> (FTypeScalar -> m ())
     -> m ()
-tryDeriveTypeVia fDerive a useType =
-    fDerive a >>= \case
+tryResolveTypeVia fResolve a useType =
+    fResolve a >>= \case
       Left err -> typeError ("error while deriving a type: " <> show err) (getSpan a)
       Right ft -> useType ft
 

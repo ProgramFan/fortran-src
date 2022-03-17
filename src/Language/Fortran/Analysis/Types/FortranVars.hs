@@ -62,12 +62,11 @@ st1 mc v idt =
       _ -> SVariable fvt (v, 0) -- TODO loc???
   where
     fvt =
-        case idVType idt of
-          Nothing -> error "typeenv stored a var with no scalar type"
-          Just ty ->
-            case fTypeArray ty of
-              Nothing    -> scalarTypeToFortranVarsType $ fTypeScalar ty
-              Just _ashp -> error "can't convert array types to fortran-vars repr yet"
+        case (idScalarType idt, idArrayInfo idt) of
+          (Nothing,   _)         -> error "typeenv stored a var with no scalar type"
+          (Just sty,  Nothing)   -> scalarTypeToFortranVarsType sty
+          (Just _sty, Just _aty) ->
+            error "can't convert array types to fortran-vars repr yet"
 
 scalarTypeToFortranVarsType :: FTypeScalar -> FVType
 scalarTypeToFortranVarsType = \case

@@ -70,10 +70,10 @@ analyseTypesWithEnv' env pf@(ProgramFile mi _) = runInfer (miVersion mi) env $ d
   forM_ eps $ \ (eName, (fName, mRetName)) -> do
     mFType <- getRecordedType fName
     case mFType of
-      Just (IDType fVType fCType) -> do
-        recordMType fVType fCType eName
+      Just idty -> do
+        modify $ \s -> s { environ = Map.insert eName idty (environ s) }
         -- FIXME: what about functions that return arrays?
-        maybe (return ()) (error "Entry points with result variables unsupported" >> recordMType fVType Nothing) mRetName
+        --maybe (return ()) (error "Entry points with result variables unsupported" >> recordMType fVType Nothing) mRetName
       _                           -> return ()
 
   annotateTypes pf              -- Annotate AST nodes with their types.

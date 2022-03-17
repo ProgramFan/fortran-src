@@ -57,7 +57,7 @@ opPlus = opNumericBin valOp typeOp
             return $ FValScalarReal $ fValRealAdd r1 r2
           (FValScalarComplex c1, FValScalarComplex c2) -> do
             return $ FValScalarComplex $ fValComplexAdd c1 c2
-          _ -> err $ "opPlus: not yet supported: given scalars:" <> show (sv1, sv2)
+          _ -> err $ "opPlus: not yet supported: given scalars: " <> show (sv1, sv2)
     typeOp sty1 sty2 = do
         case (sty1, sty2) of
           (FTypeScalarInt i1, FTypeScalarInt i2) ->
@@ -79,7 +79,7 @@ opMinus = opNumericBin valOp typeOp
             return $ FValScalarReal $ fValRealMinus r1 r2
           (FValScalarComplex c1, FValScalarComplex c2) -> do
             return $ FValScalarComplex $ fValComplexMinus c1 c2
-          _ -> err $ "opMinus: not yet supported: given scalars:" <> show (sv1, sv2)
+          _ -> err $ "opMinus: not yet supported: given scalars: " <> show (sv1, sv2)
     typeOp sty1 sty2 = do
         case (sty1, sty2) of
           (FTypeScalarInt i1, FTypeScalarInt i2) ->
@@ -102,8 +102,7 @@ opNumericBin valOp typeOp = Op{..}
             case a1s `valOp` a2s of
               Left  e -> err e
               Right x -> return $ FValScalar x
-          --(FValArray a1s, FValScalar a2s) ->
-          _ -> err "mada desu"
+          _ -> err "op: only scalars currently supported"
     opTy args = do
         let a1 = args !! 0
             a2 = args !! 1
@@ -116,6 +115,45 @@ opNumericBin valOp typeOp = Op{..}
               Just e  -> err $ "arrays diff shape: " <> e
           (FType a1sty Nothing, FType a2sty Nothing) -> do
             case a1sty `typeOp` a2sty of
+              Left  e -> err e
+              Right x -> return $ FType x Nothing
+    err :: forall a m. MonadError Error m => String -> m a
+    err = throwError . ErrorStr
+
+opNegate :: Op FType FVal
+opNegate = opNumericUn valOp typeOp
+  where
+    valOp = \case
+      FValScalarInt i -> return $ FValScalarInt $ fValIntNegate i
+      sv -> err $ "opNegate: unsupported scalar value: " <> show sv
+    typeOp sty = case sty of
+      FTypeScalarInt{} -> Right sty
+      FTypeScalarReal{} -> Right sty
+      FTypeScalarComplex{} -> Right sty
+      _ -> err $ "opNegate: unsupported scalar type: " <> show sty
+    err :: String -> Either String a
+    err = Left
+
+opNumericUn
+    :: (FValScalar -> Either String FValScalar)
+    -> (FTypeScalar -> Either String FTypeScalar)
+    -> Op FType FVal
+opNumericUn valOp typeOp = Op{..}
+  where
+    op args = do
+        let a = args !! 0
+        case a of
+          FValScalar as ->
+            case valOp as of
+              Left  e -> err e
+              Right x -> return $ FValScalar x
+          _ -> err "op: only scalars currently supported"
+    opTy args = do
+        let a = args !! 0
+        case a of
+          FType _asty (Just _aashp) -> err "op: only scalars currently supported"
+          FType asty Nothing -> do
+            case typeOp asty of
               Left  e -> err e
               Right x -> return $ FType x Nothing
     err :: forall a m. MonadError Error m => String -> m a

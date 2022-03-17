@@ -46,41 +46,27 @@ runInfer v env f = flip runReader (inferConfig0 v) $ flip runStateT (inferState0
 typeError :: MonadState InferState m => String -> SrcSpan -> m ()
 typeError msg ss = modify $ \ s -> s { typeErrors = (msg, ss):typeErrors s }
 
-emptyType :: IDType
-emptyType = IDType Nothing Nothing
-
-recordType'
-    :: MonadState InferState m => Name -> IDType -> m ()
-recordType' n idt = modify $ \ s -> s { environ = Map.insert n idt (environ s) }
-
 recordStruct :: MonadState InferState m => StructMemberTypeEnv -> Name -> m ()
 recordStruct mt n = modify $ \s -> s { structs = Map.insert n mt (structs s) }
 
--- Record the type (maybe) of the given name.
-recordMType
-    :: MonadState InferState m
-    => Maybe FType -> Maybe ConstructType -> Name -> m ()
-recordMType st ct n = modify $ \ s -> s { environ = Map.insert n (IDType st ct) (environ s) }
-
 -- Record the CType of the given name.
 recordCType :: MonadState InferState m => ConstructType -> Name -> m ()
-recordCType ct n = modify $ \ s -> s { environ = Map.alter changeFunc n (environ s) }
-  where changeFunc mIDType = Just (IDType (mIDType >>= idVType) (Just ct))
+recordCType ct n =
+    modify $ \s -> s { environ = Map.alter changeFunc n (environ s) }
+  where changeFunc mIDType = Just $ IDType (mIDType >>= idScalarType) (mIDType >>= idArrayInfo) (Just ct)
 
 recordType :: MonadState InferState m => Name -> FType -> m ()
-recordType n ty =
+recordType n (FType sty maty) =
     modify $ \s -> s { environ = Map.alter changeFunc n (environ s) }
-  where changeFunc mIDType = Just (IDType (Just ty) (mIDType >>= idCType))
+  where changeFunc mIDType = Just (IDType (Just sty) maty (mIDType >>= idCType))
 
 recordScalarType :: MonadState InferState m => Name -> FTypeScalar -> m ()
 recordScalarType n sty =
     modify $ \s -> s { environ = Map.alter changeFunc n (environ s) }
   where
     changeFunc = \case
-      Nothing   -> Just $ IDType (Just $ FType sty Nothing) Nothing
-      Just idty ->
-        let mashp = fromMaybe Nothing $ fTypeArray <$> idVType idty
-         in Just $ IDType (Just $ FType sty mashp) (idCType idty)
+      Nothing   -> Just $ IDType (Just sty) Nothing Nothing
+      Just idty -> Just $ idty { idScalarType = Just sty }
 
 recordEntryPoint :: MonadState InferState m => Name -> Name -> Maybe Name -> m ()
 recordEntryPoint fn en mRetName = modify $ \ s -> s { entryPoints = Map.insert en (fn, mRetName) (entryPoints s) }
@@ -93,15 +79,19 @@ getExprRecordedType
     :: (MonadState InferState m, Data a)
     => Expression (Analysis a) -> m (Maybe IDType)
 getExprRecordedType e@(ExpValue _ _ (ValVariable _)) = getRecordedType $ varName e
+
+-- get type of subscripted array
 getExprRecordedType (ExpSubscript _ _ base _) = do
   mTy <- getExprRecordedType base
   case mTy of
-    Just (IDType semTy (Just CTArray{})) -> pure . Just $ IDType semTy (Just CTVariable)
+    Just (IDType (Just sty) (Just aty) _) ->
+      pure . Just $ IDType (Just sty) Nothing (Just CTVariable)
     _ -> pure Nothing
+
 getExprRecordedType (ExpDataRef _ _ base ref) = do
   mTy <- getExprRecordedType base
   case mTy of
-    Just (IDType (Just (FType (FTypeScalarCustom n) _)) _) -> do
+    Just (IDType (Just (FTypeScalarCustom n)) _ _) -> do
       mStructEnv <- gets (Map.lookup n . structs)
       case mStructEnv of
         Nothing -> pure Nothing
@@ -118,25 +108,6 @@ setIDType ty x =
 -- Get the idType annotation
 getIDType :: (Annotated f, Data a) => f (Analysis a) -> Maybe IDType
 getIDType x = idType (getAnnotation x)
-
--- | For all types holding an 'IDType' (in an 'Analysis'), set the 'SemType'
---   field of the 'IDType'.
-setSemType :: (Annotated f, Data a) => FType -> f (Analysis a) -> f (Analysis a)
-setSemType st x =
-    let anno  = getAnnotation x
-        idt   = idType anno
-        anno' = anno { idType = Just (setIDTypeSemType idt) }
-     in setAnnotation anno' x
-  where
-    setIDTypeSemType :: Maybe IDType -> IDType
-    setIDTypeSemType (Just (IDType _ mCt)) = IDType (Just st) mCt
-    setIDTypeSemType Nothing               = IDType (Just st) Nothing
-
--- Set the CType part of idType annotation
---setCType :: (Annotated f, Data a) => ConstructType -> f (Analysis a) -> f (Analysis a)
---setCType ct x
---  | a@(Analysis { idType = Nothing }) <- getAnnotation x = setAnnotation (a { idType = Just (IDType Nothing (Just ct)) }) x
---  | a@(Analysis { idType = Just it }) <- getAnnotation x = setAnnotation (a { idType = Just (it { idCType = Just ct }) }) x
 
 makeEvalEnv
     :: (MonadState InferState m, MonadReader InferConfig m)

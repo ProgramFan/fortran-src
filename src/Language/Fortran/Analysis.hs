@@ -18,6 +18,8 @@ import           Language.Fortran.AST
 import           Language.Fortran.LValue
 import           Language.Fortran.Intrinsics    ( getIntrinsicDefsUses
                                                 , allIntrinsics )
+import           Language.Fortran.Repr.Type.Scalar
+import           Language.Fortran.Repr.Type.Array
 import           Language.Fortran.Repr.Type
 import           Language.Fortran.Util.Position ( SrcSpan )
 
@@ -100,7 +102,8 @@ instance Out    ConstructType
 instance Binary ConstructType
 
 data IDType = IDType
-  { idVType :: Maybe FType
+  { idScalarType :: Maybe FTypeScalar
+  , idArrayInfo  :: Maybe ArrayShape
   , idCType :: Maybe ConstructType }
   deriving (Ord, Eq, Show, Data, Typeable, Generic)
 
@@ -108,11 +111,12 @@ instance Out    IDType
 instance Binary IDType
 
 prettyIDType :: IDType -> String
-prettyIDType (IDType st ct) =
-    case (st, ct) of
-      (Nothing, Nothing)         -> "<no type info>"
-      (Just ty, Just CTVariable) -> prettyType ty
-      _                          -> show st <> " | " <> show ct
+prettyIDType (IDType msty maty mct) =
+    case (msty, maty, mct) of
+      (Nothing, Nothing, Nothing)           -> "<no type info>"
+      (Just sty, Nothing,  Just CTVariable) -> prettyScalarType sty
+      (Just sty, Just aty, Just CTVariable) -> prettyType (FType sty (Just aty))
+      _ -> show msty <> " | " <> show maty <> " | " <> show mct
 
 -- | Information about potential / actual constant expressions.
 data Constant

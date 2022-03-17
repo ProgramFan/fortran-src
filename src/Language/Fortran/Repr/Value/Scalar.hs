@@ -60,6 +60,10 @@ fValIntSafeAdd = fValIntSafeBinOp (+)
 fValIntSafeMinus :: CheckedOp FValInt
 fValIntSafeMinus = fValIntSafeBinOp (-)
 
+-- Always safe.
+fValIntNegate :: FValInt -> FValInt
+fValIntNegate (FValInt k i) = FValInt k (-i)
+
 toRuntimeRepr :: FValInt -> FValInt
 toRuntimeRepr (FValInt t x) =
   FValInt t $
@@ -81,6 +85,10 @@ fValRealAdd (FValReal t1 r1) (FValReal t2 r2) = FValReal (max t1 t2) (r1+r2)
 fValRealMinus :: FValReal -> FValReal -> FValReal
 fValRealMinus (FValReal t1 r1) (FValReal t2 r2) = FValReal (max t1 t2) (r1-r2)
 
+-- Always safe.
+fValRealNegate :: FValReal -> FValReal
+fValRealNegate (FValReal k r) = FValReal k (-r)
+
 data FValComplex = FValComplex FTypeReal Double Double
     deriving stock    (Eq, Ord, Show, Data, Typeable, Generic)
     deriving anyclass (Out, Binary)
@@ -92,6 +100,10 @@ fValComplexAdd (FValComplex t1 c1r c1i) (FValComplex t2 c2r c2i) =
 fValComplexMinus :: FValComplex -> FValComplex -> FValComplex
 fValComplexMinus (FValComplex t1 c1r c1i) (FValComplex t2 c2r c2i) =
     FValComplex (max t1 t2) (c1r-c2r) (c1i-c2i)
+
+-- Always safe.
+fValComplexNegate :: FValComplex -> FValComplex
+fValComplexNegate (FValComplex k r i) = FValComplex k (-r) (-i)
 
 -- orphan instances...
 instance Out Text where

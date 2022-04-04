@@ -11,9 +11,11 @@ module Language.Fortran.Analysis.Types.Resolve where
 
 import           Language.Fortran.AST
 import           Language.Fortran.Util.Position
+import           Language.Fortran.Analysis.Util ( traverseM )
 import           Language.Fortran.Analysis.Types.Internal
 import           Language.Fortran.Analysis.Types.Util
 import           Language.Fortran.Repr.Type.Scalar
+import           Language.Fortran.Repr.Type.Array
 import           Language.Fortran.Repr.Value
 import           Language.Fortran.Repr.Value.Scalar
 import qualified Language.Fortran.Repr.Eval as Eval
@@ -22,6 +24,8 @@ import           Language.Fortran.Repr.Kind
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader
 import           Data.Data ( Data )
+
+import           Data.List.NonEmpty ( NonEmpty( (:|) ) )
 
 data Error
   = ErrorInvalidSyntax String
@@ -154,3 +158,20 @@ chooseKindParamExpr mSel mRHSkp =
                  <> ": treating as nonstandard kind parameter syntax"
                 return $ Just rhsKp
     mSelKp = case mSel of Nothing -> Nothing; Just (Selector _ _ _ x) -> x
+
+dimensions
+    :: MonadState InferState m
+    => [DimensionDeclarator a]
+    -> m (Maybe (NonEmpty Dimension))
+dimensions dims = traverseM dimension dims >>= \case
+  Left  _err   -> return Nothing
+  Right []     -> return Nothing -- empty dimdecl: probably bad syntax, but
+                                 -- maybe could be a different array shape?
+  Right (d:ds) -> return $ Just $ d :| ds
+-- traverse to either Left err or Right ([(lower, extent)], info)
+
+dimension
+    :: MonadState InferState m
+    => DimensionDeclarator a
+    -> m (Either () Dimension)
+dimension _ = return $ Right (1, 2)

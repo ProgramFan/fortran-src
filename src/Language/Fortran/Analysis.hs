@@ -93,9 +93,9 @@ data ConstructType =
   | CTSubroutine
   | CTExternal
   | CTVariable
-  | CTArray [(Maybe Int, Maybe Int)]
-  | CTParameter
+  | CTParameter -- ^ Fortran PARAMETER (a named constant).
   | CTIntrinsic
+  | CTDummy
   deriving (Ord, Eq, Show, Data, Typeable, Generic)
 
 instance Out    ConstructType

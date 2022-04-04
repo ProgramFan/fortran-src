@@ -50,13 +50,6 @@ programUnit pu@(PUSubroutine _ _ _ _ _ blocks _) | Named n <- puName pu = do
     sequence_ [ recordEntryPoint n (varName v) Nothing | (StEntry _ _ v _ _) <- allStatements block ]
 programUnit _                                           = return ()
 
--- TODO needed? rewritten from @recordArrayDecl@
-declarator :: (MonadState InferState m, Data a) => Declarator (Analysis a) -> m ()
-declarator (Declarator _ _ v declType _ _) =
-    case declType of
-      ScalarDecl -> return ()
-      ArrayDecl dims -> recordCType (CTArray $ dimDeclarator dims) (varName v)
-
 -- TODO const eval them, don't limit to ints!!
 dimDeclarator :: AList DimensionDeclarator a -> [(Maybe Int, Maybe Int)]
 dimDeclarator ddAList = [ (lb, ub) | DimensionDeclarator _ _ lbExp ubExp <- aStrip ddAList
@@ -114,7 +107,7 @@ statement (StDimension _ _ declAList) =
   forM_ (aStrip declAList) $ \(Declarator _ _ v declType _ _) ->
       case declType of
         ScalarDecl     -> return ()
-        ArrayDecl dims -> recordCType (CTArray $ dimDeclarator dims) (varName v)
+        ArrayDecl dims -> tryRecordArrayInfo (varName v) dims
 
 -- TODO
 --statement (StStructure _ _ mName itemAList) = handleStructure mName itemAList
@@ -130,25 +123,26 @@ handleDeclarator
     -> m ()
 handleDeclarator ts attrs (Declarator _ _ v decl mLenExpr _) =
     case (decl, List.find isAttrDimension attrs) of
-      (ArrayDecl _dims, Just (AttrDimension _ _ _dims')) -> do
+      (ArrayDecl _dims1, Just (AttrDimension _ _ _dims2)) -> do
         error "strange parse: dimension info in both attribute and main declaration"
       (ArrayDecl dims, _) -> do
-        aty <- handleArrayInfo v' (aStrip dims)
-        recordArrayInfo v' aty
+        tryRecordArrayInfo v' dims
         tryRecordScalarType v' mLenExpr ts
       (ScalarDecl, Just (AttrDimension _ _ dims)) -> do
-        aty <- handleArrayInfo v' (aStrip dims)
-        recordArrayInfo v' aty
+        tryRecordArrayInfo v' dims
         tryRecordScalarType v' mLenExpr ts
       (ScalarDecl, _) -> do
         tryRecordScalarType v' mLenExpr ts
   where v' = varName v
 
-handleArrayInfo
+-- TODO needed? rewritten from @recordArrayDecl@
+declarator
     :: (MonadState InferState m, MonadReader InferConfig m)
-    => Name -> [DimensionDeclarator a]
-    -> m ArrayShape
-handleArrayInfo = undefined
+    => Declarator (Analysis a) -> m ()
+declarator (Declarator _ _ss v declType _ _) =
+    case declType of
+      ScalarDecl -> return ()
+      ArrayDecl dims -> tryRecordArrayInfo (varName v) dims
 
 -- | Try to resolve the scalar type information for a variable and record if
 --   successful.
@@ -159,36 +153,40 @@ tryRecordScalarType
 tryRecordScalarType v mDeclExpr ts = do
     tryResolveTypeVia (Resolve.fromDeclaration mDeclExpr) ts $ \sty -> recordType v (FType sty Nothing)
 
--- | Try to record the type and initial value of a scalar constant (PARAMETER)
---   declaration. The caller must provide a scalar 'Declarator'.
+-- | Try to resolve an array variable's shape. Regardless of if successful or
+--   not, record to explicit-shape.
 --
--- TODO use len if character
-handleScalarConstDecl
-    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
-    => TypeSpec (Analysis a)
-    -> Declarator (Analysis a)
+-- Arrays are annoying and complex, and our analysis isn't suited to properly
+-- identifying the different shapes. Also, we should only be finding minimal
+-- "shape type" here, because all but 1 shape type aren't constant (and neither
+-- are the dimensions). So we can't return any warnings on error, because the
+-- array might just be (legally) sized using function arguments or something.
+--
+-- We take a AList for convenience because it wraps a SrcSpan.
+tryRecordArrayInfo
+    :: (MonadState InferState m, MonadReader InferConfig m)
+    => Name -> (AList DimensionDeclarator a)
     -> m ()
-handleScalarConstDecl _ (Declarator _ _ _ _ _ Nothing) =
-    -- Should be a prohibited parse.
-    error "PARAMETER declarator missing initialization expression"
-handleScalarConstDecl _ (Declarator _ _ _ ArrayDecl{}  _ _) =
-    -- Programmer error.
-    error "scalar const handler received array const"
-handleScalarConstDecl ts (Declarator _ ss v ScalarDecl mLenExpr (Just initExpr)) = do
-    Resolve.fromDeclaration mLenExpr ts >>= \case
-      Left  err -> do
-        typeError ("error while deriving a type: " <> show err) ss
-      Right sty -> do
-        recordScalarType (varName v) sty
-        evalExpr initExpr >>= \case
-          Left  err  ->
-            typeError ("failed to evaluate initialization expression: " <> show err) (getSpan initExpr)
-          Right fval -> do
-            let FValScalar fval' = fval
-            case Coerce.coerceScalar fval' sty of
-              Left  err    -> do
-                typeError ("error while coercing PARAMETER initial value to its type: " <> show err) (getSpan initExpr)
-              Right fval'' -> assignConst (varName v) fval'' ss
+tryRecordArrayInfo v dims =
+    Resolve.dimensions (aStrip dims) >>=
+        \mds -> recordArrayInfo v (ExplicitShape mds)
+
+--------------------------------------------------------------------------------
+
+-- Wrapper around type resolution functions to use the 'Spanned' instance from
+-- the 'TypeSpec' you pass. (Generalized to all 'Spanned' because why not.)
+tryResolveTypeVia
+    :: (MonadState InferState m, Spanned a)
+    => (a -> m (Either Resolve.Error FTypeScalar))
+    -> a
+    -> (FTypeScalar -> m ())
+    -> m ()
+tryResolveTypeVia fResolve a useType =
+    fResolve a >>= \case
+      Left err -> typeError ("error while deriving a type: " <> show err) (getSpan a)
+      Right ft -> useType ft
+
+--------------------------------------------------------------------------------
 
 {-
 -- | Create a structure env from the list of fields and add it to the InferState
@@ -212,39 +210,3 @@ handleStructureItem mt (StructFields _ _ ts mAttrAList declAList) = do
 handleStructureItem mt StructUnion{} = pure mt
 handleStructureItem mt StructStructure{} = pure mt
 -}
-
---------------------------------------------------------------------------------
-
--- Wrapper around type resolution functions to use the 'Spanned' instance from
--- the 'TypeSpec' you pass. (Generalized to all 'Spanned' because why not.)
-tryResolveTypeVia
-    :: (MonadState InferState m, Spanned a)
-    => (a -> m (Either Resolve.Error FTypeScalar))
-    -> a
-    -> (FTypeScalar -> m ())
-    -> m ()
-tryResolveTypeVia fResolve a useType =
-    fResolve a >>= \case
-      Left err -> typeError ("error while deriving a type: " <> show err) (getSpan a)
-      Right ft -> useType ft
-
-data Error = ErrorEval Eval.Error deriving (Eq, Show)
-
--- Doesn't touch state.
-evalExpr
-    :: (MonadState InferState m, MonadReader InferConfig m, Data a)
-    => Expression a -> m (Either Error FVal)
-evalExpr e = do
-    evalEnv <- makeEvalEnv
-    case Eval.eval evalEnv e of
-      Left  err -> return $ Left $ ErrorEval err
-      Right val -> return $ Right val
-
-assignConst :: MonadState InferState m => Name -> FValScalar -> SrcSpan -> m ()
-assignConst var val ss = do
-    cm <- gets constMap
-    case Map.member var cm of
-      True  -> typeError ("PARAMETER redefined (using new value)") ss
-      False -> return ()
-    let cm' = Map.insert var val cm
-    modify $ \s -> s { constMap = cm' }

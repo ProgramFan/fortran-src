@@ -133,11 +133,3 @@ assignConst var val = do
       False -> do
         modify $ Map.insert var val
         return $ Right ()
-
--- lol. ty hw-kafka-client
-traverseM
-    :: (Traversable t, Applicative f, Monad m)
-    => (v -> m (f v'))
-    -> t v
-    -> m (f (t v'))
-traverseM f xs = sequenceA <$> traverse f xs

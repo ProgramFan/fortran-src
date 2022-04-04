@@ -19,7 +19,6 @@ import           Data.Data
 import           Control.Monad.State.Strict
 import           Control.Monad.Reader
 import qualified Data.Map               as Map
-import           Data.Maybe ( fromMaybe )
 
 inferState0 :: InferState
 inferState0 = InferState
@@ -93,7 +92,7 @@ getExprRecordedType e@(ExpValue _ _ (ValVariable _)) = getRecordedType $ varName
 getExprRecordedType (ExpSubscript _ _ base _) = do
   mTy <- getExprRecordedType base
   case mTy of
-    Just (IDType (Just sty) (Just aty) _) ->
+    Just (IDType (Just sty) (Just _aty) _) ->
       pure . Just $ IDType (Just sty) Nothing (Just CTVariable)
     _ -> pure Nothing
 
